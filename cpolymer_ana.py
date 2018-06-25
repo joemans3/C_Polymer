@@ -93,7 +93,8 @@ ax.set_xbound(lower=-1,upper=sizeN+1)
 ax.set_ybound(lower=-1,upper=sizeN+1)
 ax.set_zbound(lower=-1,upper=sizeN+1)
 ani = matplotlib.animation.FuncAnimation(fig, update_graph, range(1,samples[0]), blit=False)
-ani.save('/Users/baljyot/Documents/Polymer_Output/new_ani.mp4',writer=writer)
+##ani.save('/Users/baljyot/Documents/Polymer_Output/new_ani.mp4',writer=writer)
+ani.save('{0}/new_ani.mp4'.format(os.getcwd()),writer=writer)
 plt.show()
 
 
