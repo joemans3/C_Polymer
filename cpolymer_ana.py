@@ -87,13 +87,11 @@ def update_graph(num):
 
     title.set_text('3D Test, Sample={}'.format(num))
 
-
-
 graph = ax.scatter(animate_DT[0][:,0],animate_DT[0][:,1],animate_DT[0][:,2],c=animate_DT[0][:,3])
 
-ax.set_xbound(lower=0,upper=sizeN+1)
-ax.set_ybound(lower=0,upper=sizeN+1)
-ax.set_zbound(lower=0,upper=sizeN+1)
+ax.set_xbound(lower=-1,upper=sizeN+1)
+ax.set_ybound(lower=-1,upper=sizeN+1)
+ax.set_zbound(lower=-1,upper=sizeN+1)
 ani = matplotlib.animation.FuncAnimation(fig, update_graph, range(1,samples[0]), blit=False)
 ani.save('/Users/baljyot/Documents/Polymer_Output/new_ani.mp4',writer=writer)
 plt.show()
