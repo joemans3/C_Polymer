@@ -61,11 +61,29 @@ for j in range(0,samples[0]):
     VA_data_type_O.append(VA_data_type)
 
 #Creating datatype for animation (does not include animation)
-
+'''
 animate_DT = []
 
 for j in range(0,samples[0]):
     animate_DT.append(np.reshape(VA_data_type_O[j],(T_P,4)))
+'''
+
+
+temp=[]
+
+for j in VA_data_type_O:
+    tmp=[]
+    for i in j:
+        for k in i:
+            for uu in k:
+                tmp.append(uu)
+    temp.append(np.array(tmp))
+
+animate_DT=temp
+
+
+
+
 
 ############################################################################################
 
