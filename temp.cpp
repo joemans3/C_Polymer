@@ -25,7 +25,7 @@
 #include <math.h>
 #include <random>
 #define MIN(a,b) ( (a) <= (b) ? (a) : (b))
-#define TEMP 200
+#define TEMP 1
 #define EPS 0.0001
 
 typedef struct {
@@ -90,10 +90,6 @@ public:
     int sizeN;
     std::vector<int> sizeP;
     std::vector<int> sizeM;
-    std::vector<int> csizeM;
-    std::vector<int> csizeP;
-    std::vector<int> mMP;
-    std::vector<int> cmMP;
     int esi=1;
     int change;
     
@@ -270,7 +266,17 @@ void initialize_boardh(int& sizeN, std::vector<int>& sizeP, std::vector<int>& si
     int z;
     int indexs = 0;
     for (int i =0; i!=M.size(); ++i) {
-        z = counter*sizeM[i];
+        /// this is a temp hack to deal with the initilization problem. Fixe is TODO.
+        
+        int temp = 0;
+        for (int j=0;j!=sizeM.size();++j){
+            if (sizeM[j]==M[i].size()){
+                temp = j;
+            }
+            
+        }
+        //// end of hack.
+        z = counter*sizeM[temp];
         
         
         for (int j = 0; j!=M[i].size(); ++j) {
@@ -481,13 +487,17 @@ double MC_mover::hamil(double d, int c1, int c2){
 
 double MC_mover::tint_eng(VA_datatype M){
     double t_e=0.0;
-    for (int i =0; i<M.size(); ++i) {
-        for (auto& iter : int_vec) {
-            if (M[i].size() == iter.size()){
-                for (auto& inter:iter){
-                    t_e += hamil(dist(M[i][inter[0]],M[i][inter[1]]), M[i][inter[0]].charge, M[i][inter[1]].charge);
-                }
+    for (int j = 0; j!=M.size();++j){
+        int temp = 0;
+        for (int i=0;i!=sizeM.size();++i){
+            if (sizeM[i]==M[j].size()){
+                temp = i;
             }
+            
+        }
+        
+        for (auto& inter:int_vec[temp]){
+            t_e += hamil(dist(M[j][inter[0]],M[j][inter[1]]), M[j][inter[0]].charge, M[j][inter[1]].charge);
         }
     }
     return t_e;
@@ -675,13 +685,8 @@ void MC_mover::mover(){
                 double roold_eng = rout_eng(Tlist[i][tc].ID, out_dic);
                 double rinew_eng = rint_eng(tTlist, i);
                 double ronew_eng = rout_eng(tTlist[i][tc].ID, tout_dic);
-                //                std::cout << riold_eng << "," << roold_eng << "," << rinew_eng << "," << ronew_eng << "\n";
-                //                std::cout << i << "," << tc <<"\n";
-                //                for (auto& i:out_dic[i*Tlist[i].size() + tc]){
-                //                    for (auto& j:i){
-                //                        std::cout << j->x<<","<<j->y <<","<< j->z << "\n";
-                //                    }
-                //                }
+                // std::cout << riold_eng << "," << roold_eng << "," << rinew_eng << "," << ronew_eng << "\n";
+                //std::cout << i << "," << tc <<"\n";
                 
                 if(rinew_eng < riold_eng || ronew_eng < roold_eng){
                     Tlist[i][tc].updatexyz(tx, ty, tz);
@@ -741,12 +746,16 @@ void MC_mover::create_combi_uti(std::vector<std::vector<int>>& a_vec, std::vecto
 
 double MC_mover::rint_eng(VA_datatype& M,int i){
     double t_e=0.0;
-    for (auto& iter : int_vec) {
-        if (M[i].size() == iter.size()){
-            for (auto& inter:iter){
-                t_e += hamil(dist(M[i][inter[0]],M[i][inter[1]]), M[i][inter[0]].charge, M[i][inter[1]].charge);
-            }
+    int temp = 0;
+    for (int j=0;j!=sizeM.size();++j){
+        if (sizeM[j]==M[i].size()){
+            temp = j;
         }
+        
+    }
+    
+    for (auto& inter:int_vec[temp]){
+        t_e += hamil(dist(M[i][inter[0]],M[i][inter[1]]), M[i][inter[0]].charge, M[i][inter[1]].charge);
     }
     return t_e;
 }
