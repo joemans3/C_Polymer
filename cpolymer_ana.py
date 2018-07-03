@@ -4,9 +4,49 @@ import os
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation
-
-
+from cmpaircorrelation import *
 path = raw_input("Path of folder: ")
+
+
+
+
+
+####calculating center of mass with periodic conditions
+
+def cm(x,y,z,sizeN):
+    #transform x,y to -pi <-> pi
+    xpi=x*2.*np.pi/sizeN
+    ypi=y*2.*np.pi/sizeN
+    zpi=z*2.*np.pi/sizeN
+    #find the geometric mean (all points have weighting factor of 1)
+    xpi_meanc=np.mean(np.cos(xpi))
+    xpi_means=np.mean(np.sin(xpi))
+    
+    ypi_meanc=np.mean(np.cos(ypi))
+    ypi_means=np.mean(np.sin(ypi))
+    
+    
+    zpi_meanc=np.mean(np.cos(zpi))
+    zpi_means=np.mean(np.sin(zpi))
+    
+    
+    #transform back to x,y space
+    thetax=np.arctan2(-xpi_means,-xpi_meanc) + np.pi
+        
+    thetay=np.arctan2(-ypi_means,-ypi_meanc) + np.pi
+    
+    thetaz=np.arctan2(-zpi_means,-zpi_meanc) + np.pi
+        
+    xcm=sizeN*thetax/(2.*np.pi)
+    ycm=sizeN*thetay/(2.*np.pi)
+    zcm=sizeN*thetaz/(2.*np.pi)
+    
+    return np.array([xcm,ycm,zcm])
+
+
+
+
+
 
 
 #system variables
@@ -59,6 +99,43 @@ for j in range(0,samples[0]):
         else:
             VA_data_type.append(np.resize(data[T_P*j + sizeMP[i-1]+1:sizeMP[i]+T_P*j],(sizeP[i],sizeM[i],4)))
     VA_data_type_O.append(VA_data_type)
+
+#finding the center of mass for each frame
+
+CM_ar=[]
+for i in VA_data_type_O:
+    CM_ar.append(cm(i[0][:,0],i[0][:,1],i[0][:,2],sizeN))
+
+
+
+
+#calculating pair correlation function.
+
+pc_holder=[]
+radius_holder=[]
+radius_holder2=[]
+for i in range(len(VA_data_type_O)):
+    temp1 , temp2 = paircorrelation3D(VA_data_type_O[i][0][:,0],VA_data_type_O[i][0][:,1],VA_data_type_O[i][0][:,2],sizeN,CM_ar[i],VA_data_type_O[i][0][:,3],dr=0.5)
+    pc_holder.append(temp1)
+    radius_holder.append(temp2)
+#radius_holder2.append(temp3)
+plt.plot(1./(np.array(radius_holder)[:,1]))
+plt.title("Correlation Lenght Fit With Exponential Only")
+plt.xlabel("Sample Frame")
+plt.ylabel("Correlation Lenght (units of lattice)")
+plt.show()
+
+for i in pc_holder:
+    plt.plot(i,'ro')
+    plt.yscale("log")
+    plt.show()
+'''
+plt.plot(1./(np.array(radius_holder2)[:,1]))
+plt.title("Correlation Lenght Fit With Exponential + Power Law Fit")
+plt.xlabel("Sample Frame")
+plt.ylabel("Correlation Lenght (units of lattice)")
+plt.show()
+'''
 
 #Creating datatype for animation (does not include animation)
 '''
