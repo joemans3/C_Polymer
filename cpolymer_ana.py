@@ -5,10 +5,23 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation
 from cmpaircorrelation import *
+from testcf3d import *
 path = raw_input("Path of folder: ")
 
+def epo1(x,p1,p2):
+    return p1*np.exp(-x*p2)
+def epo(x,*p0):
+    return (1./(x**p0[0]))*p0[1]*np.exp(-x*p0[2]) #+ p0[3]
 
-
+def dist(x,y,z,c,N):
+    t1=np.minimum(abs(c[0]-x),abs(c[0]-x - N))
+    tx=np.minimum(t1,abs(c[0]-x + N))
+    t2=np.minimum(abs(c[1]-y),abs(c[1]-y - N))
+    ty=np.minimum(t2,abs(c[1]-y + N))
+    t3=np.minimum(abs(c[2]-z),abs(c[2]-z - N))
+    tz=np.minimum(t3,abs(c[2]-z + N))
+    temp=np.sqrt((tx)**2 + (ty)**2 + (tz)**2)
+    return temp
 
 
 ####calculating center of mass with periodic conditions
@@ -103,21 +116,71 @@ for j in range(0,samples[0]):
 #finding the center of mass for each frame
 
 CM_ar=[]
+x_per_frame=[]
+y_per_frame=[]
+z_per_frame=[]
+c_per_frame=[]
 for i in VA_data_type_O:
-    CM_ar.append(cm(i[0][:,0],i[0][:,1],i[0][:,2],sizeN))
+    per_frame_per_p_x =[]
+    per_frame_per_p_y =[]
+    per_frame_per_p_z =[]
+    per_frame_per_p_c =[]
+    for j in i[0]:
+        per_frame_per_p_x.append(j[:,0])
+        per_frame_per_p_y.append(j[:,1])
+        per_frame_per_p_z.append(j[:,2])
+        per_frame_per_p_c.append(j[:,3])
+    fx=np.array(per_frame_per_p_x).flatten()
+    fy=np.array(per_frame_per_p_y).flatten()
+    fz=np.array(per_frame_per_p_z).flatten()
+    fc=np.array(per_frame_per_p_c).flatten()
+    x_per_frame.append(fx)
+    y_per_frame.append(fy)
+    z_per_frame.append(fz)
+    c_per_frame.append(fc)
+    CM_ar.append(cm(fx,fy,fz,sizeN))
+
+
+##########
+#finding total distance per frame
+distance_arr=[]
+for i in range(len(x_per_frame)):
+    distance_t=0
+    for j in range(len(x_per_frame[i])):
+        for kk in range(j+1,len(x_per_frame[i])):
+            distance_t+=dist(x_per_frame[i][j],y_per_frame[i][j],z_per_frame[i][j],[x_per_frame[i][kk],y_per_frame[i][kk],z_per_frame[i][kk]],sizeN)
+
+    distance_arr.append(distance_t)
+
+plt.plot(distance_arr)
+plt.title("Total Distance per Sample")
+plt.xlabel("Sample #")
+plt.ylabel("Distance (lattice units)")
+plt.show()
 
 
 
+
+
+'''
 
 #calculating pair correlation function.
 
 pc_holder=[]
 radius_holder=[]
 radius_holder2=[]
+distance=[]
+radi=[]
+popt1=[]
+
 for i in range(len(VA_data_type_O)):
-    temp1 , temp2 = paircorrelation3D(VA_data_type_O[i][0][:,0],VA_data_type_O[i][0][:,1],VA_data_type_O[i][0][:,2],sizeN,CM_ar[i],VA_data_type_O[i][0][:,3],dr=0.5)
+    temp1 , temp2 ,temp3 , temp4 ,temp5 = paircorrelation3D(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=2)
     pc_holder.append(temp1)
     radius_holder.append(temp2)
+    distance.append(temp3)
+    radi.append(temp4)
+    popt1.append(temp5)
+
 #radius_holder2.append(temp3)
 plt.plot(1./(np.array(radius_holder)[:,1]))
 plt.title("Correlation Lenght Fit With Exponential Only")
@@ -125,10 +188,64 @@ plt.xlabel("Sample Frame")
 plt.ylabel("Correlation Lenght (units of lattice)")
 plt.show()
 
-for i in pc_holder:
-    plt.plot(i,'ro')
+
+plt.plot((np.array(popt1)[:,0]))
+plt.title("Correlation Lenght Fit With Exponential Only")
+plt.xlabel("Sample Frame")
+plt.ylabel("Correlation Lenght (units of lattice)")
+plt.show()
+
+'''
+
+
+pc_holder=[]
+radius_holder=[]
+radius_holder2=[]
+radi=[]
+popt1=[]
+
+for i in range(len(VA_data_type_O)):
+    temp1, temp2, temp3 = paircorrelation3D_a(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=0.5)
+    pc_holder.append(temp1)
+    radius_holder.append(temp2)
+    radi.append(temp3)
+
+'''
+#radius_holder2.append(temp3)
+for i in range(len(pc_holder)):
+    plt.plot(radi[i],pc_holder[i],'ro')
+    plt.plot(radi[i],epo1(radi[i],radius_holder[i][0],radius_holder[i][1]))
+    plt.title("Correlation Function")
+    plt.xlabel("units")
+    plt.ylabel("Averaged Correlation Function")
     plt.yscale("log")
+    #plt.xscale("log")
     plt.show()
+
+'''
+
+plt.plot(1./(np.array(radius_holder)[:,1]))
+plt.title("Correlation Length w Exponential Over Samples")
+plt.xlabel("Sample #")
+plt.ylabel("Correlation Length (lattice units)")
+plt.show()
+
+
+
+
+#for i in range(len(distance)):
+#    plt.hist(pc_holder[i])
+#
+#    plt.show()
+
+
+'''
+for i in range(len(pc_holder)):
+    plt.plot(np.arange(0,sizeN+0.5,0.5),epo(np.arange(0,sizeN+0.5,0.5),popt1[i][0],popt1[i][1],popt1[i][2]))
+    plt.plot(np.arange(0,sizeN+0.5,0.5),pc_holder[i],'ro')
+    #plt.yscale("log")
+    plt.show()
+'''
 '''
 plt.plot(1./(np.array(radius_holder2)[:,1]))
 plt.title("Correlation Lenght Fit With Exponential + Power Law Fit")
@@ -144,6 +261,16 @@ animate_DT = []
 for j in range(0,samples[0]):
     animate_DT.append(np.reshape(VA_data_type_O[j],(T_P,4)))
 '''
+
+
+
+
+
+
+
+
+
+
 
 
 temp=[]
@@ -187,6 +314,9 @@ graph = ax.scatter(animate_DT[0][:,0],animate_DT[0][:,1],animate_DT[0][:,2],c=an
 ax.set_xbound(lower=-1,upper=sizeN+1)
 ax.set_ybound(lower=-1,upper=sizeN+1)
 ax.set_zbound(lower=-1,upper=sizeN+1)
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+ax.set_zlabel("z")
 ani = matplotlib.animation.FuncAnimation(fig, update_graph, range(1,samples[0]), blit=False)
 ##ani.save('/Users/baljyot/Documents/Polymer_Output/new_ani.mp4',writer=writer)
 ani.save('{0}/new_ani.mp4'.format(os.getcwd()),writer=writer)
