@@ -208,15 +208,22 @@ int main(int argc, const char * argv[]){
 
 template <typename T>
 void get_new_x_yh(T& x, T& y,T& indexs,T& counter, std::vector<T> X, std::vector<T> Y){
-    if(indexs==X.size()){
+    if(indexs>=X.size()){
         counter+=1;
         indexs=0;
         x=0;
         y=0;
     } else{
-        indexs+=( generator() % (4 - 0) ) + 0;; //change this to initilize random lattice
-        x=X[indexs];
-        y=Y[indexs];
+        indexs+=( generator() % (5 - 3) ) + 1;; //change this to initilize random lattice
+        if (indexs>=X.size()){
+            counter+=1;
+            indexs=0;
+            x=0;
+            y=0;
+        } else{
+            x=X[indexs];
+            y=Y[indexs];
+        }
         
     }
     
@@ -260,7 +267,7 @@ void initialize_boardh(int& sizeN, std::vector<int>& sizeP, std::vector<int>& si
     
     create_1d_x_yh(sizeN, tX, tY);
     
-    
+    std::cout << tX << tX.size() <<"\n";
     int counter = 0;
     int x = 0;
     int y = 0;
@@ -276,9 +283,10 @@ void initialize_boardh(int& sizeN, std::vector<int>& sizeP, std::vector<int>& si
             }
             
         }
+        std::cout << indexs << "," << temp << "\n";
       //// end of hack.
         z = counter*sizeM[temp];
-        
+        std::cout << x << "," <<y << "," <<z <<"\n";
         
         for (int j = 0; j!=M[i].size(); ++j) {
             M[i][j].update(x,y,z,charge_dist[i][j],i+1,j+1);
@@ -450,10 +458,12 @@ MC_mover::MC_mover(std::vector<int> sM, std::vector<int> sP, int N){
 }
 
 double MC_mover::dist(Monomer_list p1, Monomer_list p2){
-    double xm = MIN(std::abs(p1.x-p2.x),std::abs(std::abs(p1.x-p2.x) -sizeN));
-    double ym = MIN(std::abs(p1.y-p2.y),std::abs(std::abs(p1.y-p2.y) -sizeN));
-    double zm = MIN(std::abs(p1.z-p2.z),std::abs(std::abs(p1.z-p2.z) -sizeN));
-    
+    double xt = MIN(std::abs(p1.x-p2.x),std::abs(p1.x-p2.x -sizeN));
+    double yt = MIN(std::abs(p1.y-p2.y),std::abs(p1.y-p2.y -sizeN));
+    double zt = MIN(std::abs(p1.z-p2.z),std::abs(p1.z-p2.z -sizeN));
+    double xm = MIN(xt,std::abs(p1.x-p2.x + sizeN));
+    double ym = MIN(yt,std::abs(p1.y-p2.y + sizeN));
+    double zm = MIN(zt,std::abs(p1.z-p2.z + sizeN));
     double distance = sqrt(pow(xm, 2) + pow(ym, 2) + pow(zm, 2));
     
     return distance;
@@ -604,7 +614,8 @@ void MC_mover::mover(){
         double& tx= tTlist[i][tc].x;
         double& ty= tTlist[i][tc].y;
         double& tz= tTlist[i][tc].z;
-    //    std::cout << tx << "," <<ty << "," <<tz << "\n";
+        //std::cout << tx << "," <<ty << "," <<tz << "\n";
+        //std::cout << Tlist.size() << "," << i << "\n";
         switch (mc) {
             case 1:
                 tx = std::abs(fmod((tx + 1*r + sizeN),sizeN));
@@ -652,33 +663,36 @@ void MC_mover::mover(){
         }
         
         bool good_dis = false;
-        
-        if (tc==0) {
-          //  std::cout << tTlist[i][tc].x << ","<< tTlist[i][tc].y << ","<< tTlist[i][tc].z << "," << tTlist[i][tc+1].x<< ","<< tTlist[i][tc+1].y<< ","<< tTlist[i][tc+1].z << "\n";
-           // std::cout << dist(tTlist[i][tc],tTlist[i][tc+1]) << "\n";
-            if (dist(tTlist[i][tc],tTlist[i][tc+1]) < 1.3) {
+        if (Tlist[i].size() > 1){
+            if (tc==0) {
+                //  std::cout << tTlist[i][tc].x << ","<< tTlist[i][tc].y << ","<< tTlist[i][tc].z << "," << tTlist[i][tc+1].x<< ","<< tTlist[i][tc+1].y<< ","<< tTlist[i][tc+1].z << "\n";
+                // std::cout << dist(tTlist[i][tc],tTlist[i][tc+1]) << "\n";
+                if (dist(tTlist[i][tc],tTlist[i][tc+1]) < 1.3) {
+                    
+                    good_dis = true;
+                }
+            } else if (tc==Tlist[i].size()-1){
+                //    std::cout << tTlist[i][tc].x << ","<< tTlist[i][tc].y << ","<< tTlist[i][tc].z << "," << tTlist[i][tc+1].x<< ","<< tTlist[i][tc+1].y<< ","<< tTlist[i][tc+1].z << "\n";
                 
-                good_dis = true;
-            }
-        } else if (tc==Tlist[i].size()-1){
-        //    std::cout << tTlist[i][tc].x << ","<< tTlist[i][tc].y << ","<< tTlist[i][tc].z << "," << tTlist[i][tc+1].x<< ","<< tTlist[i][tc+1].y<< ","<< tTlist[i][tc+1].z << "\n";
-            
-          //  std::cout << dist(tTlist[i][tc],tTlist[i][tc+1]) << "," << dist(tTlist[i][tc],tTlist[i][tc-1]) << "\n";
-            if (dist(tTlist[i][tc],tTlist[i][tc-1]) < 1.3) {
-                good_dis = true;
+                //  std::cout << dist(tTlist[i][tc],tTlist[i][tc+1]) << "," << dist(tTlist[i][tc],tTlist[i][tc-1]) << "\n";
+                if (dist(tTlist[i][tc],tTlist[i][tc-1]) < 1.3) {
+                    good_dis = true;
+                }
+            } else {
+                //   std::cout << tTlist[i][tc].x << ","<< tTlist[i][tc].y << ","<< tTlist[i][tc].z << "," << tTlist[i][tc-1].x<< ","<< tTlist[i][tc-1].y<< ","<< tTlist[i][tc-1].z << "\n";
+                // std::cout << dist(tTlist[i][tc],tTlist[i][tc-1]) << "\n";
+                if (dist(tTlist[i][tc],tTlist[i][tc+1]) < 1.3 && dist(tTlist[i][tc],tTlist[i][tc-1]) < 1.3) {
+                    
+                    good_dis = true;
+                }
             }
         } else {
-         //   std::cout << tTlist[i][tc].x << ","<< tTlist[i][tc].y << ","<< tTlist[i][tc].z << "," << tTlist[i][tc-1].x<< ","<< tTlist[i][tc-1].y<< ","<< tTlist[i][tc-1].z << "\n";
-           // std::cout << dist(tTlist[i][tc],tTlist[i][tc-1]) << "\n";
-            if (dist(tTlist[i][tc],tTlist[i][tc+1]) < 1.3 && dist(tTlist[i][tc],tTlist[i][tc-1]) < 1.3) {
-                
-                good_dis = true;
-            }
+            good_dis=true;
         }
         
         
         if (good_dis==true) {
-            bool lattice_check = ((Clist[int(tx)][int(ty)][int(tz)])==1.0);
+            bool lattice_check = false;//((Clist[int(tx)][int(ty)][int(tz)])==1.0);
             
             // std::cout << "Coords: "<< tx <<"," <<ty <<","<<tz<<"\n";
             if(lattice_check==false){
@@ -686,17 +700,23 @@ void MC_mover::mover(){
                 double roold_eng = rout_eng(Tlist[i][tc].ID, out_dic);
                 double rinew_eng = rint_eng(tTlist, i);
                 double ronew_eng = rout_eng(tTlist[i][tc].ID, tout_dic);
-               // std::cout << riold_eng << "," << roold_eng << "," << rinew_eng << "," << ronew_eng << "\n";
-                //std::cout << i << "," << tc <<"\n";
 
-                if(rinew_eng < riold_eng || ronew_eng < roold_eng){
+                //std::cout << i << "," << tc <<"\n";
+                if(rinew_eng == 0 && riold_eng ==0){
+                    rinew_eng+=1;
+                }
+               // std::cout << riold_eng << "," << roold_eng << "," << rinew_eng << "," << ronew_eng << "\n";
+                if(rinew_eng < riold_eng && ronew_eng < roold_eng){
+                    //std::cout << riold_eng << "," << roold_eng << "," << rinew_eng << "," << ronew_eng << "\n";
                     Tlist[i][tc].updatexyz(tx, ty, tz);
                     change+=1;
+                    (Clist[int(tx)][int(ty)][int(tz)])=1.0;
                 } else {
                     float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-                    if (std::exp(-(rinew_eng-riold_eng)/TEMP) > r1 || std::exp(-(ronew_eng-roold_eng)/TEMP) > r1) {
+                    if (std::exp(-(rinew_eng-riold_eng)/TEMP) > r1 && std::exp(-(ronew_eng-roold_eng)/TEMP) > r1) {
                         Tlist[i][tc].updatexyz(tx, ty, tz);
                         change+=1;
+                        Clist[int(tx)][int(ty)][int(tz)]=1.0;
                     }
                 }
               //  std::cout <<change << "\n";
@@ -795,10 +815,12 @@ double MC_mover::distp(Monomer_list * p1, Monomer_list * p2){
 */
 
 double MC_mover::distp(Monomer_list * p1, Monomer_list * p2){
-    double xm = MIN(std::abs(p1->x-p2->x),std::abs(std::abs(p1->x-p2->x) -sizeN));
-    double ym = MIN(std::abs(p1->y-p2->y),std::abs(std::abs(p1->y-p2->y) -sizeN));
-    double zm = MIN(std::abs(p1->z-p2->z),std::abs(std::abs(p1->z-p2->z) -sizeN));
-    
+    double xt = MIN(std::abs(p1->x-p2->x),std::abs(p1->x-p2->x -sizeN));
+    double yt = MIN(std::abs(p1->y-p2->y),std::abs(p1->y-p2->y -sizeN));
+    double zt = MIN(std::abs(p1->z-p2->z),std::abs(p1->z-p2->z -sizeN));
+    double xm = MIN(xt,std::abs(p1->x-p2->x + sizeN));
+    double ym = MIN(yt,std::abs(p1->y-p2->y + sizeN));
+    double zm = MIN(zt,std::abs(p1->z-p2->z + sizeN));
     double distance = sqrt(pow(xm, 2) + pow(ym, 2) + pow(zm, 2));
     
     return distance;
