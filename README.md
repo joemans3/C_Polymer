@@ -76,11 +76,11 @@ We use [SemVer](http://semver.org/) for versioning. For the versions available, 
 
 * **Baljyot Parmar**
 
-See also the list of [contributors](https://github.com/joemans3/C_Polymer/contributors){:target="_blank"} who participated in this project.
+See also the list of [contributors](https://github.com/joemans3/C_Polymer/contributors) who participated in this project.
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE){:target="_blank"} file for details
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details
 
 ## Acknowledgments
-[Stack Overflow](https://stackoverflow.com){:target="_blank"} and other mentioned users in specific code blocks.  
+[Stack Overflow](https://stackoverflow.com) and other mentioned users in specific code blocks.  
