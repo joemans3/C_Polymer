@@ -83,4 +83,4 @@ See also the list of [contributors](https://github.com/joemans3/C_Polymer/contri
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details
 
 ## Acknowledgments
-
+[Stack Overflow](https://stackoverflow.com) and other mentioned users in specific code blocks.  
