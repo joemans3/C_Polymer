@@ -5,8 +5,74 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation
 from cmpaircorrelation import *
-from testcf3d import *
+from scipy.optimize import curve_fit
 path = raw_input("Path of folder: ")
+
+
+
+
+def dis(x,y,z,x1,y1,z1,N):
+    t1=np.minimum(abs(x1-x),abs(x1-x - N))
+    tx=np.minimum(t1,abs(x1-x + N))
+    t2=np.minimum(abs(y1-y),abs(y1-y - N))
+    ty=np.minimum(t2,abs(y1-y + N))
+    t3=np.minimum(abs(z1-z),abs(z1-z - N))
+    tz=np.minimum(t3,abs(z1-z + N))
+    temp=np.sqrt((tx)**2 + (ty)**2 + (tz)**2)
+    return temp
+
+
+def fit_MSD(t,p_0,p_1):
+    return p_0 * (t**(p_1))
+
+
+def MSD_tavg(x,y,z,N):
+    return np.mean(np.diff(dis(np.array(x)[1:],np.array(y)[1:],np.array(z)[1:],np.array(x)[0],np.array(y)[0],np.array(z)[0],N))**2)/6.
+
+
+def track_decomp(x,y,z,N):
+    #takes tracks and finds MSD for various timestep conditions.
+    
+    #return array-like:
+    #msd = msd values at all tau values considered
+    #popt = fitted parameters on MSD equation
+    #pcov = covariance matrix of fit
+    max_track_decomp = 10.
+    max_decomp = np.floor(len(x)/max_track_decomp)
+    tau = range(1,int(max_decomp+1))
+    msd = []
+    for i in tau:
+        n_x = np.array(x)[::i]
+        n_y = np.array(y)[::i]
+        n_z = np.array(z)[::i]
+        msd.append(MSD_tavg(n_x,n_y,n_z,N))
+    
+    #popt , pcov = curve_fit(fit_MSD,tau,np.array(msd),p0=[1,1],maxfev=10000)
+    
+    
+    return np.array(msd)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def epo1(x,p1,p2):
     return p1*np.exp(-x*p2)
@@ -114,49 +180,49 @@ for j in range(0,samples[0]):
     VA_data_type_O.append(VA_data_type)
 
 #finding the center of mass for each frame
-
-CM_ar=[]
-x_per_frame=[]
-y_per_frame=[]
-z_per_frame=[]
-c_per_frame=[]
-for i in VA_data_type_O:
-    per_frame_per_p_x =[]
-    per_frame_per_p_y =[]
-    per_frame_per_p_z =[]
-    per_frame_per_p_c =[]
-    for j in i[0]:
-        per_frame_per_p_x.append(j[:,0])
-        per_frame_per_p_y.append(j[:,1])
-        per_frame_per_p_z.append(j[:,2])
-        per_frame_per_p_c.append(j[:,3])
-    fx=np.array(per_frame_per_p_x).flatten()
-    fy=np.array(per_frame_per_p_y).flatten()
-    fz=np.array(per_frame_per_p_z).flatten()
-    fc=np.array(per_frame_per_p_c).flatten()
-    x_per_frame.append(fx)
-    y_per_frame.append(fy)
-    z_per_frame.append(fz)
-    c_per_frame.append(fc)
-    CM_ar.append(cm(fx,fy,fz,sizeN))
-
-
-##########
-#finding total distance per frame
-distance_arr=[]
-for i in range(len(x_per_frame)):
-    distance_t=0
-    for j in range(len(x_per_frame[i])):
-        for kk in range(j+1,len(x_per_frame[i])):
-            distance_t+=dist(x_per_frame[i][j],y_per_frame[i][j],z_per_frame[i][j],[x_per_frame[i][kk],y_per_frame[i][kk],z_per_frame[i][kk]],sizeN)
-
-    distance_arr.append(distance_t)
-
-plt.plot(distance_arr)
-plt.title("Total Distance per Sample")
-plt.xlabel("Sample #")
-plt.ylabel("Distance (lattice units)")
-plt.show()
+#
+#CM_ar=[]
+#x_per_frame=[]
+#y_per_frame=[]
+#z_per_frame=[]
+#c_per_frame=[]
+#for i in VA_data_type_O:
+#    per_frame_per_p_x =[]
+#    per_frame_per_p_y =[]
+#    per_frame_per_p_z =[]
+#    per_frame_per_p_c =[]
+#    for j in i[0]:
+#        per_frame_per_p_x.append(j[:,0])
+#        per_frame_per_p_y.append(j[:,1])
+#        per_frame_per_p_z.append(j[:,2])
+#        per_frame_per_p_c.append(j[:,3])
+#    fx=np.array(per_frame_per_p_x).flatten()
+#    fy=np.array(per_frame_per_p_y).flatten()
+#    fz=np.array(per_frame_per_p_z).flatten()
+#    fc=np.array(per_frame_per_p_c).flatten()
+#    x_per_frame.append(fx)
+#    y_per_frame.append(fy)
+#    z_per_frame.append(fz)
+#    c_per_frame.append(fc)
+#    CM_ar.append(cm(fx,fy,fz,sizeN))
+#
+#
+###########
+##finding total distance per frame
+#distance_arr=[]
+#for i in range(len(x_per_frame)):
+#    distance_t=0
+#    for j in range(len(x_per_frame[i])):
+#        for kk in range(j+1,len(x_per_frame[i])):
+#            distance_t+=dist(x_per_frame[i][j],y_per_frame[i][j],z_per_frame[i][j],[x_per_frame[i][kk],y_per_frame[i][kk],z_per_frame[i][kk]],sizeN)
+#
+#    distance_arr.append(distance_t)
+#
+#plt.plot(distance_arr)
+#plt.title("Total Distance per Sample")
+#plt.xlabel("Sample #")
+#plt.ylabel("Distance (lattice units)")
+#plt.show()
 
 
 
@@ -198,37 +264,48 @@ plt.show()
 '''
 
 
-pc_holder=[]
-radius_holder=[]
-radius_holder2=[]
-radi=[]
-popt1=[]
 
-for i in range(len(VA_data_type_O)):
-    temp1, temp2, temp3 = paircorrelation3D_a(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=0.5)
-    pc_holder.append(temp1)
-    radius_holder.append(temp2)
-    radi.append(temp3)
 
-'''
-#radius_holder2.append(temp3)
-for i in range(len(pc_holder)):
-    plt.plot(radi[i],pc_holder[i],'ro')
-    plt.plot(radi[i],epo1(radi[i],radius_holder[i][0],radius_holder[i][1]))
-    plt.title("Correlation Function")
-    plt.xlabel("units")
-    plt.ylabel("Averaged Correlation Function")
-    plt.yscale("log")
-    #plt.xscale("log")
-    plt.show()
+##############################################################################################
+####correlation length stuff
 
-'''
 
-plt.plot(1./(np.array(radius_holder)[:,1]))
-plt.title("Correlation Length w Exponential Over Samples")
-plt.xlabel("Sample #")
-plt.ylabel("Correlation Length (lattice units)")
-plt.show()
+#
+#pc_holder=[]
+#radius_holder=[]
+#radius_holder2=[]
+#radi=[]
+#popt1=[]
+#
+#for i in range(len(VA_data_type_O)):
+#    temp1, temp2, temp3 = paircorrelation3D_a(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=0.5)
+#    pc_holder.append(temp1)
+#    radius_holder.append(temp2)
+#    radi.append(temp3)
+#
+#'''
+##radius_holder2.append(temp3)
+#for i in range(len(pc_holder)):
+#    plt.plot(radi[i],pc_holder[i],'ro')
+#    plt.plot(radi[i],epo1(radi[i],radius_holder[i][0],radius_holder[i][1]))
+#    plt.title("Correlation Function")
+#    plt.xlabel("units")
+#    plt.ylabel("Averaged Correlation Function")
+#    plt.yscale("log")
+#    #plt.xscale("log")
+#    plt.show()
+#
+#'''
+#
+#plt.plot(1./(np.array(radius_holder)[:,1]))
+#plt.title("Correlation Length w Exponential Over Samples")
+#plt.xlabel("Sample #")
+#plt.ylabel("Correlation Length (lattice units)")
+#plt.show()
+#
+
+
+
 
 
 
@@ -285,6 +362,35 @@ for j in VA_data_type_O:
 
 animate_DT=temp
 
+############################################################################################
+#msd stuff for SINGLE POLYMER SIMULATIONS ONLY!
+
+
+
+
+'''
+
+n_ordered_arr = np.zeros((sizeM[0],samples[0],4))
+for i in range(len(animate_DT)):
+    for j in range(len(animate_DT[i])):
+        n_ordered_arr[j][i] = animate_DT[i][j]
+
+mt_msd = np.zeros(sizeM[0])
+mt_fit = np.zeros((sizeM[0],2))
+for i in range(len(n_ordered_arr)):
+    pp = n_ordered_arr[i]
+    one_msd_decomp = track_decomp(pp[:,0],pp[:,1],pp[:,2],sizeN)
+    popt, pcov = curve_fit(fit_MSD,range(1,len(one_msd_decomp)+1)[:int(len(range(1,len(one_msd_decomp)+1))*0.5)],one_msd_decomp[:int(len(range(1,len(one_msd_decomp)+1))*0.5)],p0=[1,1],maxfev=10000)
+    mt_fit[i] = popt
+    mt_msd[i] = MSD_tavg(pp[:,0],pp[:,1],pp[:,2],sizeN)
+
+plt.plot(mt_msd)
+plt.show()
+
+plt.plot(mt_fit[:,1])
+plt.show()
+
+'''
 
 
 
@@ -322,6 +428,8 @@ ani = matplotlib.animation.FuncAnimation(fig, update_graph, range(1,samples[0]),
 ani.save('{0}/new_ani.mp4'.format(os.getcwd()),writer=writer)
 plt.show()
 
+plt.plot(animate_DT[0][:,0],animate_DT[0][:,1],'ro')
+plt.show()
 
 '''
 for k in range(0,samples[0]):

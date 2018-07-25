@@ -609,7 +609,7 @@ void MC_mover::mover(){
         int tc=( generator() % (Tlist[i].size() - 0) ) + 0;
         int mc=( generator() % (6 - 1 + 1) ) + 1;
         //float r3 = -360 + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(360+360)));
-        float r = 0.1*static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        float r = 0.5*static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         //std::cout << r << "\n";
         double& tx= tTlist[i][tc].x;
         double& ty= tTlist[i][tc].y;
@@ -692,7 +692,7 @@ void MC_mover::mover(){
         
         
         if (good_dis==true) {
-            bool lattice_check = false;//((Clist[int(tx)][int(ty)][int(tz)])==1.0);
+            bool lattice_check = false; //((Clist[int(tx)][int(ty)][int(tz)])==1.0);
             
             // std::cout << "Coords: "<< tx <<"," <<ty <<","<<tz<<"\n";
             if(lattice_check==false){
@@ -705,20 +705,46 @@ void MC_mover::mover(){
                 if(rinew_eng == 0 && riold_eng ==0){
                     rinew_eng+=1;
                 }
-               // std::cout << riold_eng << "," << roold_eng << "," << rinew_eng << "," << ronew_eng << "\n";
-                if(rinew_eng < riold_eng && ronew_eng < roold_eng){
-                    //std::cout << riold_eng << "," << roold_eng << "," << rinew_eng << "," << ronew_eng << "\n";
+                
+                
+                
+                
+                
+                // proper MHMC scheme; more compact.
+                double min_out_energy = MIN(1.,std::exp(-(ronew_eng-roold_eng)/TEMP));
+                double min_in_energy = MIN(1., std::exp(-(rinew_eng-riold_eng)/TEMP));
+                
+                float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+                
+                if (r1<min_in_energy && r1<min_out_energy) {
                     Tlist[i][tc].updatexyz(tx, ty, tz);
                     change+=1;
-                    (Clist[int(tx)][int(ty)][int(tz)])=1.0;
-                } else {
-                    float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-                    if (std::exp(-(rinew_eng-riold_eng)/TEMP) > r1 && std::exp(-(ronew_eng-roold_eng)/TEMP) > r1) {
-                        Tlist[i][tc].updatexyz(tx, ty, tz);
-                        change+=1;
-                        Clist[int(tx)][int(ty)][int(tz)]=1.0;
-                    }
+                    Clist[int(tx)][int(ty)][int(tz)]=1.0;
                 }
+            
+            
+                
+                
+                
+                
+                
+                
+                
+                
+//               // std::cout << riold_eng << "," << roold_eng << "," << rinew_eng << "," << ronew_eng << "\n";
+//                if(rinew_eng < riold_eng && ronew_eng < roold_eng){
+//                    //std::cout << riold_eng << "," << roold_eng << "," << rinew_eng << "," << ronew_eng << "\n";
+//                    Tlist[i][tc].updatexyz(tx, ty, tz);
+//                    change+=1;
+//                    (Clist[int(tx)][int(ty)][int(tz)])=1.0;
+//                } else {
+//                    float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+//                    if (std::exp(-(rinew_eng-riold_eng)/TEMP) > r1 && std::exp(-(ronew_eng-roold_eng)/TEMP) > r1) {
+//                        Tlist[i][tc].updatexyz(tx, ty, tz);
+//                        change+=1;
+//                        Clist[int(tx)][int(ty)][int(tz)]=1.0;
+//                    }
+                
               //  std::cout <<change << "\n";
             }
 
