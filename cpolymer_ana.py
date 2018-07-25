@@ -3,9 +3,12 @@ import sys
 import os
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import axes3d as ax3d
 import matplotlib.animation
 from cmpaircorrelation import *
 from scipy.optimize import curve_fit
+
+import pdb
 path = raw_input("Path of folder: ")
 
 
@@ -176,7 +179,7 @@ for j in range(0,samples[0]):
         if i==0:
             VA_data_type.append(np.resize(data[T_P*j:sizeMP[i]+T_P*j],(sizeP[i],sizeM[i],4)))
         else:
-            VA_data_type.append(np.resize(data[T_P*j + sizeMP[i-1]+1:sizeMP[i]+T_P*j],(sizeP[i],sizeM[i],4)))
+            VA_data_type.append(np.resize(data[T_P*j + sizeMP[i-1]:sizeMP[i]+T_P*j],(sizeP[i],sizeM[i],4)))
     VA_data_type_O.append(VA_data_type)
 
 #finding the center of mass for each frame
@@ -394,13 +397,99 @@ plt.show()
 
 
 
+##########################################################################################################
+#testing out new animations for line plot only!
+##########################################################################################################
 
-############################################################################################
+#fig = plt.figure()
+#ax1 = ax3d.Axes3D(fig)
+#line, = ax1.plot([], [], lw=1, linestyle= "-")
+#
+#ax1.set_xlim(0,sizeN)
+#ax1.set_ylim(0,sizeN)
+#ax1.set_zlim(0,sizeN)
+#ax1.set_xlabel("x")
+#ax1.set_ylabel("y")
+#ax1.set_zlabel("z")
+#ax1.text2D(0, 0, "Title", transform=ax1.transAxes)
+#
+#plotlays, plotcols = [np.sum(sizeP)], ["orange","black"]
+#lines = []
+#for index in range(np.sum(sizeP)):
+#    lobj = ax1.plot([],[],lw=1)[0]
+#    lines.append(lobj)
+#
+#def init():
+#    for line in lines:
+#        line.set_data([],[])
+#        line.set_3d_properties([])
+#    return lines
+#
+#def animate(i):
+#
+#    
+#    xlist = []
+#    ylist = []
+#    zlist = []
+#    
+#    for j in range(len(VA_data_type_O[i])):
+#        for k in range(len(VA_data_type_O[i][j])):
+#            xlist.append(np.asarray(VA_data_type_O[i][j][k])[:,0])
+#            ylist.append(np.asarray(VA_data_type_O[i][j][k])[:,1])
+#            zlist.append(np.asarray(VA_data_type_O[i][j][k])[:,2])
+#    for lnum,line in enumerate(lines):
+#        line.set_data(xlist[lnum], ylist[lnum])
+#        line.set_3d_properties(zlist[lnum])
+#    return lines
+#
+#anim = matplotlib.animation.FuncAnimation(fig, animate,init_func=init, frames=range(1,samples[0]), blit=True)
+#
+#plt.show()
 
-#plotting and animations
+##########################################################################################################
+##########################################################################################################
 
-############################################################################################
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#############################################################################################
+#
+##plotting and animations
+#
+#############################################################################################
+#
 # Set up formatting for the movie files
 Writer = matplotlib.animation.writers['ffmpeg']
 writer = Writer(fps=10, metadata=dict(artist='Baljyot Parmar, all rights reserved'), bitrate=1800)
