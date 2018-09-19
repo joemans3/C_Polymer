@@ -29,11 +29,21 @@ def fit_MSD(t,p_0,p_1):
     return p_0 * (t**(p_1))
 
 
-def MSD_tavg(x,y,z,N):
+def MSD_tavg(x,y,z,f,N,f_inc = False):
+    
+    dists = np.zeros(len(x)-1)
+    for i in range(len(x)-1):
+        dists[i] = dis(x[i],y[i],z[i],x[i+1],y[i+1],z[i+1],N)
+    if f_inc == True:
+        return np.mean((np.diff(dists/np.diff(f)))**2)/4.
+    else:
+        return np.mean((np.diff(dists))**2)/6.
+
+def MSD_tavg1(x,y,z,N):
     return np.mean(np.diff(dis(np.array(x)[1:],np.array(y)[1:],np.array(z)[1:],np.array(x)[0],np.array(y)[0],np.array(z)[0],N))**2)/6.
 
 
-def track_decomp(x,y,z,N):
+def track_decomp(x,y,z,f,N):
     #takes tracks and finds MSD for various timestep conditions.
     
     #return array-like:
@@ -48,7 +58,12 @@ def track_decomp(x,y,z,N):
         n_x = np.array(x)[::i]
         n_y = np.array(y)[::i]
         n_z = np.array(z)[::i]
-        msd.append(MSD_tavg(n_x,n_y,n_z,N))
+        try:
+            n_f = np.array(f)[::i]
+            msd.append(MSD_tavg(n_x,n_y,n_z,n_f,N))
+        except:
+            msd.append(MSD_tavg(n_x,n_y,n_z,f,N))
+
     
     #popt , pcov = curve_fit(fit_MSD,tau,np.array(msd),p0=[1,1],maxfev=10000)
     
@@ -58,7 +73,31 @@ def track_decomp(x,y,z,N):
 
 
 
+def track_decomp1(x,y,f):
+    #takes tracks and finds MSD for various timestep conditions.
+    
+    #return array-like:
+    #msd = msd values at all tau values considered
+    #popt = fitted parameters on MSD equation
+    #pcov = covariance matrix of fit
+    max_track_decomp = 1.
+    max_decomp = np.floor(len(x)/max_track_decomp)
+    tau = range(1,int(max_decomp+1.0))
+    msd = []
+    for i in tau:
+        if i < len(x):
+            n_x = np.array(x)[::i]
+            n_y = np.array(y)[::i]
+            try:
+                n_f = np.array(f)[::i]
+                msd.append(MSD_tavg(n_x,n_y,n_f))
+            except:
+                msd.append(MSD_tavg(n_x,n_y,f))
 
+    #popt , pcov = curve_fit(fit_MSD,tau,np.array(msd),p0=[1,1],maxfev=10000)
+
+
+    return np.array(msd)
 
 
 
@@ -394,6 +433,201 @@ plt.plot(mt_fit[:,1])
 plt.show()
 
 '''
+
+
+def fit_decom(d,thresh = 0.5,max = 100000):
+
+    popt, pcov = curve_fit(fit_MSD,range(1,len(d)+1)[:int(len(range(1,len(d)+1))*thresh)],d[:int(len(range(1,len(d)+1))*thresh)],p0=[1,1],maxfev=10000)
+    return [popt,pcov]
+
+
+
+
+############################################################################################
+#msd stuff for ALL POLYMER SIMULATIONS
+
+new_size = np.asarray(sizeM)*np.asarray(sizeP)
+#tracks per polymer type
+track_ptype = []
+
+
+msd_t_meana = np.zeros(len(sizeM))
+msd_t_mean_verba = []
+    
+fit_verbosea = [[] for i in new_size]
+fit_verbosed = [[] for i in new_size]
+fit_msdaa = []
+    
+msd_s_meana = []
+msd_s_mean_va = [[] for i in new_size]
+
+for k in range(len(sizeM)):
+    n_ordered_arr = np.zeros((sizeM[k],sizeP[k],samples[0],4))
+    for i in range(len(VA_data_type_O)):
+        for j in range(len(VA_data_type_O[i][k])):
+            for l in range(len(VA_data_type_O[i][k][j])):
+                n_ordered_arr[l][j][i] = VA_data_type_O[i][k][j][l]
+
+    track_ptype.append(n_ordered_arr)
+
+    #msd
+
+    msd_t_mean = np.zeros(len(n_ordered_arr))
+
+
+    fit_verbose = []
+
+    msd_s_mean = []
+    msd_s_mean_v = []
+    for i in range(len(n_ordered_arr)):
+        msd_t_mean_p = np.zeros(len(n_ordered_arr[i]))
+        msd_dec = []
+        
+        for j in range(len(n_ordered_arr[i])):
+            pp = n_ordered_arr[i][j]
+            
+            msd_t_mean_p[j] = MSD_tavg(pp[:,0],pp[:,1],pp[:,2],1,sizeN)
+            tttt=track_decomp(pp[:,0],pp[:,1],pp[:,2],1,sizeN)
+            msd_dec.append(tttt)
+            msd_s_mean_va[k].append(tttt)
+            aaaa=fit_decom(tttt)
+            fit_verbosea[k] = fit_verbosea[k] + [aaaa[0][1]]
+            fit_verbosed[k] = fit_verbosed[k] + [aaaa[0][0]]
+        
+
+
+        msd_dec = np.mean(np.asarray(msd_dec),axis = 0)
+        msd_s_mean.append(msd_dec)
+                        
+        msd_t_mean[i] = np.mean(msd_t_mean_p)
+
+    msd_s_meana.append(np.mean(np.asarray(msd_s_mean),axis = 0))
+
+    fit_msdaa.append(fit_decom(np.mean(np.asarray(msd_s_mean),axis = 0))[0])
+
+    msd_t_meana[k] = np.mean(msd_t_mean)
+    msd_t_mean_verba.append(msd_t_mean)
+
+
+
+
+def msd_plot(m,verbose = False):
+    '''Verbose: all msd or averaged ; True, False'''
+    if verbose:
+        for i in range(len(m)):
+            for j in m[i]:
+                plt.plot(j)
+            plt.ylabel("MSD")
+            plt.xlabel("Tau")
+            plt.title("P = {0}, M = {1}".format(sizeP[i],sizeM[i]))
+            plt.yscale("log")
+            plt.xscale("log")
+            plt.show()
+    else:
+        for i in range(len(m)):
+            plt.plot(m[i],label="{0}".format(i+1))
+        plt.ylabel("MSD")
+        plt.xlabel("Tau")
+        plt.title("P = {0}, M = {1}".format(sizeP,sizeM))
+        plt.yscale("log")
+        plt.xscale("log")
+        plt.legend()
+        plt.show()
+    return
+
+
+def create_box_plot(box_data,tick_list,y_label = "",x_label = "",y_lim = (),title = ""):
+    ticks = tick_list
+    plt.boxplot(box_data,positions = range(1,len(tick_list)+1))
+    for i in range(1,len(tick_list)+1):
+        y = box_data[i-1]
+        x = np.random.normal(i, 0.04, size=len(y))
+        plt.plot(x, y, 'r.', alpha=0.2)
+    try:
+        plt.ylim(y_lim)
+    except:
+        print "Warning: y_lim not valid"
+    plt.xticks(xrange(1, len(ticks) * 1 + 1, 1), ticks)
+    plt.ylabel(y_label)
+    plt.xlabel(x_label)
+    plt.title(title)
+    plt.show()
+
+    return
+
+from sklearn import mixture
+
+def GMM_utility(data, n, biners=50, inclusion_thresh = [0,100], verbose=True, title_1d="", title_2d="", x_label="", y_label_2d="", log=True, x_limit = ()):
+    
+    data = np.array(data)
+    
+    p_thresh = np.percentile(data,inclusion_thresh)
+    inds = ((data>=p_thresh[0]) & (data<=p_thresh[1]))
+    data = data[inds]
+    
+    gmix = mixture.GMM(n_components=n, covariance_type='diag')
+    if log:
+        (results,bins) = np.histogram(np.log(data),density='true',bins=biners)
+    else:
+        (results,bins) = np.histogram(data,density='true',bins=biners)
+    
+    
+    data_arr = np.zeros((len(data),2))
+    data_arr[:,0] = np.random.normal(1, 0.04, size=len(data))
+    if log:
+        data_arr[:,1] = np.log(data)
+    else:
+        data_arr[:,1] = data
+    if verbose:
+        plt.plot(data_arr[:,1],data_arr[:,0],'r.')
+        plt.ylim((0,2))
+        plt.title(title_1d)
+        plt.xlabel(x_label)
+        plt.show()
+    gmix.fit(data_arr)
+
+    if log:
+        print "Fitted Mean: {0} +/- {1}".format(gmix.means_[:,1],np.sqrt(gmix.covars_[:,1]))
+        print "Fitted Mean(normal): {0} +/- {1}".format(np.exp(gmix.means_[:,1]),np.exp(gmix.means_[:,1])*np.sqrt(gmix.covars_[:,1]))
+    else:
+        print "Fitted Mean: {0} +/- {1}".format(gmix.means_[:,1],np.sqrt(gmix.covars_[:,1]))
+    max_r = np.max(results)
+    plt.plot(np.diff(bins)+bins[:len(bins)-1],results)
+
+    for i in gmix.means_:
+        plt.axvline(x=i[1],color='red')
+    plt.title(title_2d)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label_2d)
+    try:
+        plt.xlim(x_limit)
+    except:
+        print "Warning: x_limit is invalid"
+    plt.show()
+
+    return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
