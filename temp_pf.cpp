@@ -29,9 +29,9 @@
 #include <math.h>
 #include <random>
 #include <iomanip>
+#include <libconfig.h++>
 
 #define MIN(a,b) ( (a) <= (b) ? (a) : (b))
-#define TEMP 1
 #define EPS 0.0001
 #define PATH_MAX_NEW 1024
 
@@ -40,6 +40,7 @@ std::string getcwd_string( void ) {
     char buff[PATH_MAX_NEW];
     getcwd( buff, PATH_MAX_NEW );
     std::string cwd( buff );
+    std::cout << cwd << std::endl;
     return cwd;
 }
 
@@ -68,7 +69,7 @@ class CSV_out {
 public:
     CSV_out(std::vector<int>,std::vector<int>,int,int,int);
     template <typename T>
-    void write_data(T& data, int& sizeN, std::vector<int>& sizeM,std::vector<int>& sizeP, bool O, int samples=100);
+    void write_data(T& data, int& sizeN, std::vector<int>& sizeM,std::vector<int>& sizeP, bool O, int samples,std::string version,std::string chg, double temp);
     char const* get_folder_path(std::vector<int>,std::vector<int>,int,int,int);
     char const* get_time();
 };
@@ -83,6 +84,7 @@ public:
     Monomer_list();
     void update(double x1, double y1, double z1, int charge1, int P, int M);
     void updatexyz(double x1, double y1, double z1);
+    void update_charge(int charge);
 };
 
 //typedefs
@@ -104,6 +106,12 @@ public:
     std::unordered_map<int, std::vector<std::vector<Monomer_list *>>> out_dic;
     std::unordered_map<int, std::vector<std::vector<Monomer_list *>>> tout_dic;
     
+    std::vector<std::vector<std::vector<int>>> changed_charge_list;
+    std::vector<int> charge_changes;
+
+
+
+
     double i_eng;
     double o_eng;
     double t_eng;
@@ -114,9 +122,16 @@ public:
     int esi=1;
     int change;
     double hook_spring_const;
-    
+    std::vector<std::vector<int>> DEFAULT_VECTOR_INT;
+    double temperature;
+
+
+    void update_chrg_dist(std::vector<int> times,std::vector<std::vector<std::vector<int>>> dist);
+    void change_chg_distribution(int time, std::vector<std::vector<int>> dist);
+
+
     double hookian_bond(double d, int c1, int c2);
-    MC_mover(std::vector<int> sizeM, std::vector<int> sizeP, int N, double hook_k);
+    MC_mover(std::vector<int> sizeM, std::vector<int> sizeP, int N, double hook_k, bool verbose, std::vector<std::vector<int>>& charge_dister, double temper);
     double hamil(double,int,int);
     double dist(Monomer_list, Monomer_list);
     void update_ints();
@@ -147,7 +162,7 @@ void int_grid(LT_datatype& new_LT, int& sizeN);
 template <typename T = int>
 std::vector<std::vector<int>> ask_charge(std::vector<T>& sizeM,std::vector<T>& sizeP,std::vector<std::vector<T>>& chg_p_monomer);
 
-void initialize_boardh(int& sizeN, std::vector<int>& sizeP, std::vector<int>& sizeM, VA_datatype& M, LT_datatype& L, VA_datatype& M1);
+void initialize_boardh(int& sizeN, std::vector<int>& sizeP, std::vector<int>& sizeM, VA_datatype& M, LT_datatype& L, VA_datatype& M1, bool verbose, std::vector<std::vector<int>>& charge_dister);
 
 template <typename T = int>
 void create_1d_x_yh(T const& sizeN ,std::vector<T> & X,std::vector<T> & Y);
@@ -221,14 +236,17 @@ int main(int argc, const char * argv[]){
     int N;
     int R;
     int samples;
-    
+    double tp;
+    bool verbose;
+    std::string ver;
 
+    std::vector<std::vector<int>> read_charge_dist;
 
+    std::string read_charge_dist_string;
 
+    std::vector<int> cchng_times;
 
-
-
-
+    std::vector<std::vector<std::vector<int>>> chng_chrg_list;
 
     if (argc < 2) { // check if arguments are passed from command-line. If not ask for input from users
         //for prompt after running
@@ -237,24 +255,130 @@ int main(int argc, const char * argv[]){
         N = get_user_input("Size of box: ");
         R = get_user_input("MC mover (in multiples of 100): ");
         samples = get_user_input("How many samples to take: ");
+        verbose = false;
+
+
     } else { // If command-line arguments are passed parse argv and get the relavent parameters
         // for compile-time
-        // add check to see the length of sP -> argument 1 -> index 1 in argv
-        
-        
-        std::vector<int> sP;
-        std::vector<int> sM;
-        
-        int N;
-        int R;
-        int samples;
+
+
+        libconfig::Config cfg;
+        cfg.setOptions(libconfig::Config::OptionFsync
+                | libconfig::Config::OptionSemicolonSeparators
+                | libconfig::Config::OptionColonAssignmentForGroups
+                | libconfig::Config::OptionOpenBraceOnSeparateLine);
+        try
+        {
+            cfg.readFile(argv[1]);
+        }
+        catch(const libconfig::FileIOException &fioex)
+        {
+            std::cerr << "I/O error while reading file." << std::endl;
+            return(EXIT_FAILURE);
+        }
+        catch(const libconfig::ParseException &pex)
+        {
+            std::cerr << "Parse error at " << pex.getFile() << ":" << pex.getLine()
+              << " - " << pex.getError() << std::endl;
+            return(EXIT_FAILURE);
+        }
+
+        const libconfig::Setting &poly = cfg.lookup("global_vars.polymer_n");
+        const libconfig::Setting &mono = cfg.lookup("global_vars.monomer_n");
+        const libconfig::Setting &cdist = cfg.lookup("muta_vars.chrg_dis");
+        const libconfig::Setting &cchange = cfg.lookup("muta_vars.change_times");
+        const libconfig::Setting &charg_change = cfg.lookup("muta_vars.change_chrg_dis");
+
+
+        for (int n = 0; n < cchange.getLength(); ++n)
+        {
+            cchng_times.push_back(cchange[n]);
+            std::vector<std::vector<int>> temp_child;
+
+
+
+            for (int i = 0; i < poly.getLength(); ++i){
+
+
+                std::vector<int> child;
+                if (poly.getLength() == 1){
+                    std::cout <<"hi"<< "/n";
+                    for (int j = 0; j < charg_change[n].getLength(); ++j)
+                {
+                    child.push_back(charg_change[n][j]);
+                }
+                } else{
+                    for (int j = 0; j < charg_change[n][i].getLength(); ++j)
+                {
+                    child.push_back(charg_change[n][i][j]);
+                }   
+                }
+                temp_child.push_back(child);
+                
+            }
+            chng_chrg_list.push_back(temp_child);
+        }
+
+        for (int n = 0; n < poly.getLength(); ++n)
+        {
+          sP.push_back(poly[n]);
+          sM.push_back(mono[n]);
+          std::vector<int> child;
+          for (int i = 0; i < cdist[n].getLength(); ++i)
+          {
+            child.push_back(cdist[n][i]);
+          }
+          read_charge_dist.push_back(child);
+        }
+        std::cout << chng_chrg_list << "/n";
+        std::cout << read_charge_dist << "/n";
+        std::cout << cchng_times << std::endl;
+
+        std::ostringstream tstring_arr;
+        tstring_arr << "Ordered Charge Distribution [ ";
+        for (int n = 0; n < read_charge_dist.size(); ++n)
+        {
+            
+            tstring_arr << "[ ";
+            for (int i = 0; i < read_charge_dist[n].size(); ++i)
+            {
+                tstring_arr << read_charge_dist[n][i];
+                if (i != read_charge_dist[n].size()){
+                    tstring_arr << ",";
+                }
+            }
+            tstring_arr << " ]";
+
+        }
+        tstring_arr << " ]";
+
+        tstring_arr << "\n";
+
+
+        std::cout << sP << sM << std::endl;
+        std::string version = cfg.lookup("version");
+        ver = version;
+        N = cfg.lookup("global_vars.box_dim");
+        R = cfg.lookup("global_vars.simtime_t");
+        samples = cfg.lookup("global_vars.samples");
+        tp = cfg.lookup("global_vars.t");
+        verbose = true;
+
+        tstring_arr << "R: ";
+        tstring_arr << R;
+        tstring_arr << ", ";
+        tstring_arr << "Samples: ";
+        tstring_arr << samples;
+        read_charge_dist_string = tstring_arr.str();
     }
-    
 
-
-    
-    
-    MC_mover test(sM,sP,N,1.0);
+    /*for (int i = 0; i < sP.size(); ++i)
+    {
+        std::cout << read_charge_dist[i] << std::endl;
+    }*/
+    std::cout << "reached" <<std::endl;
+    MC_mover test(sM,sP,N,1.0,verbose,read_charge_dist,tp);
+    test.update_chrg_dist(cchng_times,chng_chrg_list);
 //    for(auto& i:test.int_vec){
 //        std::cout << "[";
 //        for(auto& j:i){
@@ -264,18 +388,39 @@ int main(int argc, const char * argv[]){
 //    }
     
     CSV_out new_file(sP,sM,N,R,samples);
-    new_file.write_data(test.Tlist, test.sizeN, test.sizeM, test.sizeP,0,samples +1);
+    new_file.write_data(test.Tlist, test.sizeN, test.sizeM, test.sizeP,0,samples +1,ver,read_charge_dist_string,tp);
+
    // new_file.write_data(test.Tlist, test.sizeN, test.sizeM, test.sizeP);
  //   std::cout << test.Tlist[2][2].x << "\n";
-    int counter =0;
+    int counter = 0;
+    int size_times = cchng_times.size();
     int percent_R = int(R/100.);
+    int change_counter = 0;
     for (int i=0; i<R; ++i) {
+
+        if (size_times>change_counter){ 
+
+            if (cchng_times[change_counter] == i){
+                test.change_chg_distribution(cchng_times[change_counter],chng_chrg_list[change_counter]);
+                change_counter+=1;
+            }
+
+            
+
+
+
+            
+
+
+
+        }
+
         if (i%(int((1./samples)*R)) == 0){
             if (i%(percent_R) == 0){
                 std::cout << "Percent complete: " << (float(i)/float(R))*100 << "%" << "\n";
             }
             if(counter<samples){
-                new_file.write_data(test.Tlist, test.sizeN, test.sizeM, test.sizeP,1);
+                new_file.write_data(test.Tlist, test.sizeN, test.sizeM, test.sizeP,1,samples,ver,read_charge_dist_string,tp);
                 counter += 1;
             }
         }
@@ -285,13 +430,13 @@ int main(int argc, const char * argv[]){
     std::cout << test.change;
    // std::cout << test.Tlist[2][2].x << "\n";
 
-    return 0;
+
     
 }
 
-unsigned int convert_chara_vec_to_usint(const char * argv_c[], int numb){
+//unsigned int convert_chara_vec_to_usint(const char * argv_c[], int numb){
     
-}
+//}
 
 
 template <typename T>
@@ -302,8 +447,9 @@ void get_new_x_yh(T& x, T& y,T& indexs,T& counter, std::vector<T> X, std::vector
         x=0;
         y=0;
     } else{
-        indexs+=( generator() % (5 - 3) ) + 1;; //change this to initilize random lattice
+        indexs+=1;//( generator() % (5 - 3) ) + 1;; //change this to initilize random lattice
         if (indexs>=X.size()){
+            std::cout << "I'm moving up" << std::endl;
             counter+=1;
             indexs=0;
             x=0;
@@ -339,28 +485,47 @@ void create_1d_x_yh(T const& sizeN ,std::vector<T>& X,std::vector<T>& Y){
     
 }
 
-void initialize_boardh(int& sizeN, std::vector<int>& sizeP, std::vector<int>& sizeM, VA_datatype& M, LT_datatype& L, VA_datatype& M1){
+void initialize_boardh(int& sizeN, std::vector<int>& sizeP, std::vector<int>& sizeM, VA_datatype& M, LT_datatype& L, VA_datatype& M1, bool verbose, std::vector<std::vector<int>>& charge_dister){
     
     std::vector<std::vector<int>> charge_dist;
-    ask_charge(sizeM,sizeP,charge_dist);
-   // for(auto& i:charge_dist){
+    if (verbose)
+    {
+        for(int i = 0; i!=sizeP.size(); ++i){
+            for(int j = 0; j!=sizeP[i]; ++j){
+                charge_dist.push_back(charge_dister[i]);
+            }
+        }
+       // charge_dist = charge_dister;
+
+    }else{
+
+        ask_charge(sizeM,sizeP,charge_dist);
+
+    }
+    std::cout << charge_dist << std::endl;
+    std::cout << sizeP << sizeM << std::endl;
+   // for(auto& i:charge_dist){ 
       //  std::cout << i;
    // }
+
     int it = *max_element(sizeM.begin(), sizeM.end());
+    
     int check_n_m = floor(sizeN/it);
+    std::cout << check_n_m << " : check_n_m" << std::endl;
     //int total_P = boost::accumulate(sizeP,0);
     std::vector<int> tX(sizeN*sizeN);
     std::vector<int> tY(sizeN*sizeN);
     
     
     create_1d_x_yh(sizeN, tX, tY);
-    
+
     //std::cout << tX << tX.size() <<"\n";
     int counter = 0;
     int x = 0;
     int y = 0;
     int z;
     int indexs = 0;
+    std::cout << M.size() << std::endl;
     for (int i =0; i!=M.size(); ++i) {
     /// this is a temp hack to deal with the initilization problem. Fixe is TODO.
         
@@ -371,6 +536,8 @@ void initialize_boardh(int& sizeN, std::vector<int>& sizeP, std::vector<int>& si
             }
             
         }
+
+        std::cout << temp <<std::endl;
        // std::cout << indexs << "," << temp << "\n";
       //// end of hack.
         z = counter*sizeM[temp];
@@ -385,10 +552,12 @@ void initialize_boardh(int& sizeN, std::vector<int>& sizeP, std::vector<int>& si
     
         get_new_x_yh(x,y,indexs,counter,tX,tY);
         if (check_n_m<counter) {
-            break;
+            std::cout << "Breaked Stuff" << std::endl;
+            exit(1);
         }
+        
     }
-    
+    std::cout << "reached end" <<std::endl;
 }
 
 
@@ -402,6 +571,15 @@ void int_grid(LT_datatype& new_LT, int& sizeN){
         }
     }
 }
+
+
+
+
+void Monomer_list::update_charge(int charge1){
+    charge = charge1;
+}
+
+
 
 
 Monomer_list::Monomer_list(){
@@ -483,13 +661,47 @@ std::vector<std::vector<int>> ask_charge(std::vector<T>& sizeM,std::vector<T>& s
 }
 
 
+// NEED TO FIND A BETTER WAY TO FIND FOLDER UNIQUE NAME
+char const* CSV_out::get_folder_path(std::vector<int> P,std::vector<int> M,int N,int R,int S){
+    std::string cwd = getcwd_string();
+    char buffer_day[80];
+    char buffer_time[80];
+    
+    auto tt  = std::time(nullptr);
+    struct tm *tm_now = localtime(&tt);
+    
+    strftime(buffer_day,sizeof(buffer_day),"%d-%m-%Y",tm_now);
+    std::string str_day(buffer_day);
+    
+    strftime(buffer_time,sizeof(buffer_time),"%H-%M-%S",tm_now);
+    std::string str_time(buffer_time);
+    
+    
+    std::string new_cwd_folder = cwd + "/" + str_day;
+    filename = (new_cwd_folder + "/" + str_time + "_P" + convert_vec_string(P) + "_M" + convert_vec_string(M) + "_N" + std::to_string(N) + "_R" + std::to_string(R) + "_S" + std::to_string(S)).c_str();
+    char const* ca = new_cwd_folder.c_str();
+    return ca;
+}
+
+
 CSV_out::CSV_out(std::vector<int> P,std::vector<int> M,int N,int R,int S){
     folder_path = get_folder_path(P,M,N,R,S);
-    mkdir(folder_path,0777);
+    std::cout << "folder name"<< folder_path <<std::endl;
+    if (mkdir(folder_path,0777)){
+
+        if( errno == EEXIST ) {
+        // alredy exists
+        } else {
+           // something else
+            std::cout << "cannot create session folder name error:" << strerror(errno) << std::endl;
+            exit(1);
+        }
+    }   
+    //mkdir(folder_path,0777)
 }
 
 template <typename T>
-void CSV_out::write_data(T& coords,int& sizeN, std::vector<int>& sizeM, std::vector<int>& sizeP, bool O, int samples){
+void CSV_out::write_data(T& coords,int& sizeN, std::vector<int>& sizeM, std::vector<int>& sizeP, bool O, int samples, std::string version, std::string chg, double tp){
     std::fstream file;
     if(O==1){
         file.open(filename, std::ios::out | std::ios::ate | std::ios::app);
@@ -515,8 +727,15 @@ void CSV_out::write_data(T& coords,int& sizeN, std::vector<int>& sizeM, std::vec
         }
         tstring << ";";
         tstring << samples;
+        tstring << ";";
+        tstring << version;
         file << tstring.str();
         file << "\n";
+        file << chg;
+        file << " Temperature: ";
+        file << tp;
+        file << "\n";
+
     }
     
     for (auto& i : coords) {
@@ -529,37 +748,49 @@ void CSV_out::write_data(T& coords,int& sizeN, std::vector<int>& sizeM, std::vec
     
 }
 
-char const* CSV_out::get_folder_path(std::vector<int> P,std::vector<int> M,int N,int R,int S){
-    std::string cwd = getcwd_string();
-    char buffer_day[80];
-    char buffer_time[80];
-    
-    auto tt  = std::time(nullptr);
-    struct tm *tm_now = localtime(&tt);
-    
-    strftime(buffer_day,sizeof(buffer_day),"%d-%m-%Y",tm_now);
-    std::string str_day(buffer_day);
-    
-    strftime(buffer_time,sizeof(buffer_time),"%H-%M-%S",tm_now);
-    std::string str_time(buffer_time);
-    
-    
-    std::string new_cwd_folder = cwd + "/" + str_day;
-    filename = (new_cwd_folder + "/" + str_time + "_P" + convert_vec_string(P) + "_M" + convert_vec_string(M) + "_N" + std::to_string(N) + "_R" + std::to_string(R) + "_S" + std::to_string(S)).c_str();
-    char const* ca = new_cwd_folder.c_str();
-    return ca;
+
+void MC_mover::change_chg_distribution(int time, std::vector<std::vector<int>> dist){
+    std::vector<std::vector<int>> charge_dist;
+    //make distribution into repeating list 
+    for(int i = 0; i!=sizeP.size(); ++i){
+        for(int j = 0; j!=sizeP[i]; ++j){
+            charge_dist.push_back(dist[i]);
+        }
+    }
+    //use repeating list of charg distribution from above to change charge for each point
+    for (int i =0; i!=Tlist.size(); ++i) {
+        for (int j = 0; j!=Tlist[i].size(); ++j) {
+            Tlist[i][j].update_charge(charge_dist[i][j]);
+            tTlist[i][j].update_charge(charge_dist[i][j]);
+        }
+    }
+
+
 }
 
 
-MC_mover::MC_mover(std::vector<int> sM, std::vector<int> sP, int N, double hook_k){
+
+
+
+
+
+
+
+void MC_mover::update_chrg_dist(std::vector<int> times,std::vector<std::vector<std::vector<int>>> dist){
+    changed_charge_list = dist;
+    charge_changes = times;
+
+}
+
+MC_mover::MC_mover(std::vector<int> sM, std::vector<int> sP, int N, double hook_k, bool verbose, std::vector<std::vector<int>>& charge_dister, double temper){
     sizeM = sM;
     sizeP = sP;
     sizeN = N;
+    temperature = temper;
     hook_spring_const = hook_k;
     create_VA(sizeM, sizeP, Tlist, tTlist);
     Clist.resize(boost::extents[sizeN][sizeN][sizeN]);
-    initialize_boardh(sizeN, sizeP, sizeM, Tlist, Clist, tTlist);
-
+    initialize_boardh(sizeN, sizeP, sizeM, Tlist, Clist, tTlist, verbose, charge_dister);
     create_combi_multi(int_vec, sizeM, 2);
     
     create_out_dic();
@@ -603,7 +834,7 @@ double MC_mover::dist(Monomer_list p1, Monomer_list p2){
 */
 double MC_mover::hamil(double d, int c1, int c2){
     
-    double temp = ((1./d)*c1*c2 - esi*1./(pow(d,6)) + esi*1./(pow(d,12)) + 0.0*pow(d,4));
+    double temp = ((1./d)*c1*c2 + 0.0*pow(d,4));
     
     return temp;
 }
@@ -611,7 +842,7 @@ double MC_mover::hamil(double d, int c1, int c2){
 double MC_mover::hookian_bond(double d, int c1, int c2){
     
     
-    double temp = hook_spring_const*pow((d-1.0), 2);
+    double temp = - esi*1./(pow(d,6)) + esi*1./(pow(d,12));//0*hook_spring_const*pow((d-1.0), 2);
     
     return temp;
 }
@@ -792,12 +1023,12 @@ void MC_mover::mover(){
                 
                 
                 // proper MHMC scheme; more compact.
-                double min_out_energy = MIN(1.,std::exp(-(ronew_eng-roold_eng)/TEMP));
-                double min_in_energy = MIN(1., std::exp(-(rinew_eng-riold_eng)/TEMP));
+                double min_out_energy = MIN(1.,std::exp(-(ronew_eng-roold_eng)/temperature));
+                double min_in_energy = MIN(1., std::exp(-(rinew_eng-riold_eng)/temperature));
                 
                 float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-                
-                if (r1<min_in_energy && r1<min_out_energy) {
+                float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+                if ((r1<=min_in_energy) || (r2<=min_out_energy)) {
                     Tlist[i][tc].updatexyz(tx, ty, tz);
                     change+=1;
                     Clist[int(tx)][int(ty)][int(tz)]=1.0;
@@ -888,18 +1119,16 @@ double MC_mover::rint_eng(VA_datatype& M,int i){
             double d1 = dist(M[i][inter[0]],M[i][inter[1]]);
             int c1 = M[i][inter[0]].charge;
             int c2 = M[i][inter[1]].charge;
-            /*
-            if (inter[0]==0) {
-                t_e += hookian_bond(dist(M[i][inter[0]], M[i][inter[0]+1]), M[i][inter[0]].charge, M[i][inter[0]+1].charge);
-            } else if (inter[0]==sizeM[temp]){
-                t_e += hookian_bond(dist(M[i][inter[0]], M[i][inter[0]-1]), M[i][inter[0]].charge, M[i][inter[0]-1].charge);
-            } else {
-                t_e += hookian_bond(dist(M[i][inter[0]], M[i][inter[0]+1]), M[i][inter[0]].charge, M[i][inter[0]+1].charge);
-                t_e += hookian_bond(dist(M[i][inter[0]], M[i][inter[0]-1]), M[i][inter[0]].charge, M[i][inter[0]-1].charge);
-            }
-            */
+
             t_e += hamil(d1,c1,c2);
         }
+    }
+    for (int j=0;j!=(M[i].size()-1);++j)
+    {
+        double d1 = dist(M[i][j],M[i][j+1]);
+        int c1 = M[i][j].charge;
+        int c2 = M[i][j+1].charge;
+        t_e += hookian_bond(d1,c1,c2);
     }
     
     return t_e;

@@ -7,7 +7,7 @@ from mpl_toolkits.mplot3d import axes3d as ax3d
 import matplotlib.animation
 from cmpaircorrelation import *
 from scipy.optimize import curve_fit
-
+import shutil
 import pdb
 path = raw_input("Path of folder: ")
 
@@ -35,9 +35,9 @@ def MSD_tavg(x,y,z,f,N,f_inc = False):
     for i in range(len(x)-1):
         dists[i] = dis(x[i],y[i],z[i],x[i+1],y[i+1],z[i+1],N)
     if f_inc == True:
-        return np.mean((np.diff(dists/np.diff(f)))**2)/4.
+        return np.mean((np.diff(dists/np.diff(f)))**2)#/4.
     else:
-        return np.mean((np.diff(dists))**2)/6.
+        return np.mean((np.diff(dists))**2)#/6.
 
 def MSD_tavg1(x,y,z,N):
     return np.mean(np.diff(dis(np.array(x)[1:],np.array(y)[1:],np.array(z)[1:],np.array(x)[0],np.array(y)[0],np.array(z)[0],N))**2)/6.
@@ -179,7 +179,8 @@ samples = 0
 def convert_to_int(input):
 
     return map(int,input.split(","))
-
+def convert_to_float(input):
+    return map(float,input.split(","))
 def convert_globals(input):
     SC_index_a = []
     C_index_a = []
@@ -194,83 +195,101 @@ def convert_globals(input):
     sizeN = int(input[:SC_index_a[0]])
     sizeP = convert_to_int(input[SC_index_a[0]+1:SC_index_a[1]])
     sizeM = convert_to_int(input[SC_index_a[1]+1:SC_index_a[2]])
-    samples = convert_to_int(input[SC_index_a[2]+1:])
-    return [sizeN, sizeP, sizeM, samples]
+    samples = convert_to_int(input[SC_index_a[2]+1:SC_index_a[3]])
+    version = input[SC_index_a[3]+1:]
+    return [sizeN, sizeP, sizeM, samples,version]
 
-
+#change to ignore first line
 with open(path,"r") as f:
     line = (f.readline()).rstrip('\n')
-    sizeN,sizeP,sizeM,samples = convert_globals(line)
+    sizeN,sizeP,sizeM,samples,version = convert_globals(line)
 f.close()
+
+dname = os.path.dirname(path)
+os.chdir(dname)
+
+if not os.path.exists(path[len(dname)+1:]+"_folder"):
+    os.makedirs(path[len(dname)+1:]+"_folder")
+
+os.chdir(path+"_folder")
+
+
 
 sizeMP = np.cumsum(np.asarray(sizeM)*np.asarray(sizeP))
 T_P= np.sum(np.asarray(sizeM)*np.asarray(sizeP))
-data = np.loadtxt(path,delimiter=",",skiprows=1)
+data = np.loadtxt(path,delimiter=",",skiprows=3)
+
+shutil.move(path,path+"_folder/"+path[len(dname)+1:])
+
+
 
 
 VA_data_type_O = []  #datatype for line plots, doesnt work for animation
+with open(path[len(dname)+1:]+".xyz","w+") as f:
 
-for j in range(0,samples[0]):
-
-    VA_data_type = []
-
-    for i in range(0,len(sizeMP)):
-        if i==0:
-            VA_data_type.append(np.resize(data[T_P*j:sizeMP[i]+T_P*j],(sizeP[i],sizeM[i],4)))
-        else:
-            VA_data_type.append(np.resize(data[T_P*j + sizeMP[i-1]:sizeMP[i]+T_P*j],(sizeP[i],sizeM[i],4)))
-    VA_data_type_O.append(VA_data_type)
-
+    for j in range(0,samples[0]):
+        f.write("{0}\n".format(T_P))
+        f.write("\n")
+        VA_data_type = []
+        for i in range(0,T_P):
+            f.write("H {0} {1} {2}\n".format(data[samples[0]*j + i][0],data[samples[0]*j + i][1],data[samples[0]*j + i][2]))
+        for i in range(0,len(sizeMP)):
+            if i==0:
+                VA_data_type.append(np.resize(data[T_P*j:sizeMP[i]+T_P*j],(sizeP[i],sizeM[i],4)))
+            else:
+                VA_data_type.append(np.resize(data[T_P*j + sizeMP[i-1]:sizeMP[i]+T_P*j],(sizeP[i],sizeM[i],4)))
+        VA_data_type_O.append(VA_data_type)
+f.close()
 #finding the center of mass for each frame
-#
-#CM_ar=[]
-#x_per_frame=[]
-#y_per_frame=[]
-#z_per_frame=[]
-#c_per_frame=[]
-#for i in VA_data_type_O:
-#    per_frame_per_p_x =[]
-#    per_frame_per_p_y =[]
-#    per_frame_per_p_z =[]
-#    per_frame_per_p_c =[]
-#    for j in i[0]:
-#        per_frame_per_p_x.append(j[:,0])
-#        per_frame_per_p_y.append(j[:,1])
-#        per_frame_per_p_z.append(j[:,2])
-#        per_frame_per_p_c.append(j[:,3])
-#    fx=np.array(per_frame_per_p_x).flatten()
-#    fy=np.array(per_frame_per_p_y).flatten()
-#    fz=np.array(per_frame_per_p_z).flatten()
-#    fc=np.array(per_frame_per_p_c).flatten()
-#    x_per_frame.append(fx)
-#    y_per_frame.append(fy)
-#    z_per_frame.append(fz)
-#    c_per_frame.append(fc)
-#    CM_ar.append(cm(fx,fy,fz,sizeN))
-#
-#
-###########
-##finding total distance per frame
-#distance_arr=[]
-#for i in range(len(x_per_frame)):
-#    distance_t=0
-#    for j in range(len(x_per_frame[i])):
-#        for kk in range(j+1,len(x_per_frame[i])):
-#            distance_t+=dist(x_per_frame[i][j],y_per_frame[i][j],z_per_frame[i][j],[x_per_frame[i][kk],y_per_frame[i][kk],z_per_frame[i][kk]],sizeN)
-#
-#    distance_arr.append(distance_t)
-#
-#plt.plot(distance_arr)
-#plt.title("Total Distance per Sample")
-#plt.xlabel("Sample #")
-#plt.ylabel("Distance (lattice units)")
-#plt.show()
+
+CM_ar=[]
+x_per_frame=[]
+y_per_frame=[]
+z_per_frame=[]
+c_per_frame=[]
+for i in VA_data_type_O:
+   per_frame_per_p_x =[]
+   per_frame_per_p_y =[]
+   per_frame_per_p_z =[]
+   per_frame_per_p_c =[]
+   for j in i[0]:
+       per_frame_per_p_x.append(j[:,0])
+       per_frame_per_p_y.append(j[:,1])
+       per_frame_per_p_z.append(j[:,2])
+       per_frame_per_p_c.append(j[:,3])
+   fx=np.array(per_frame_per_p_x).flatten()
+   fy=np.array(per_frame_per_p_y).flatten()
+   fz=np.array(per_frame_per_p_z).flatten()
+   fc=np.array(per_frame_per_p_c).flatten()
+   x_per_frame.append(fx)
+   y_per_frame.append(fy)
+   z_per_frame.append(fz)
+   c_per_frame.append(fc)
+   CM_ar.append(cm(fx,fy,fz,sizeN))
+
+
+
+#finding total distance per frame
+distance_arr=[]
+for i in range(len(x_per_frame)):
+   distance_t=0
+   for j in range(len(x_per_frame[i])):
+       for kk in range(j+1,len(x_per_frame[i])):
+           distance_t+=dist(x_per_frame[i][j],y_per_frame[i][j],z_per_frame[i][j],[x_per_frame[i][kk],y_per_frame[i][kk],z_per_frame[i][kk]],sizeN)
+
+   distance_arr.append(distance_t)
+
+plt.plot(distance_arr)
+plt.title("Total Distance per Sample")
+plt.xlabel("Sample #")
+plt.ylabel("Distance (lattice units)")
+plt.show()
 
 
 
 
 
-'''
+
 
 #calculating pair correlation function.
 
@@ -279,15 +298,25 @@ radius_holder=[]
 radius_holder2=[]
 distance=[]
 radi=[]
-popt1=[]
+
 
 for i in range(len(VA_data_type_O)):
-    temp1 , temp2 ,temp3 , temp4 ,temp5 = paircorrelation3D(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=2)
+    temp1 , temp2 ,temp3 , temp4 = paircorrelation3D(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=1)
     pc_holder.append(temp1)
     radius_holder.append(temp2)
     distance.append(temp3)
     radi.append(temp4)
-    popt1.append(temp5)
+
+
+# for i in range(len(pc_holder[::10])):
+#     plt.plot(radi[i],pc_holder[i],'ro')
+#     plt.plot(radi[i],epo1(radi[i],radius_holder[i][0],radius_holder[i][1]))
+#     plt.title("Correlation Function")
+#     plt.xlabel("units")
+#     plt.ylabel("Averaged Correlation Function")
+#     plt.yscale("log")
+#     #plt.xscale("log")
+#     plt.show()
 
 #radius_holder2.append(temp3)
 plt.plot(1./(np.array(radius_holder)[:,1]))
@@ -296,7 +325,7 @@ plt.xlabel("Sample Frame")
 plt.ylabel("Correlation Lenght (units of lattice)")
 plt.show()
 
-
+'''
 plt.plot((np.array(popt1)[:,0]))
 plt.title("Correlation Lenght Fit With Exponential Only")
 plt.xlabel("Sample Frame")
@@ -312,40 +341,38 @@ plt.show()
 ####correlation length stuff
 
 
-#
-#pc_holder=[]
-#radius_holder=[]
-#radius_holder2=[]
-#radi=[]
-#popt1=[]
-#
-#for i in range(len(VA_data_type_O)):
-#    temp1, temp2, temp3 = paircorrelation3D_a(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=0.5)
-#    pc_holder.append(temp1)
-#    radius_holder.append(temp2)
-#    radi.append(temp3)
-#
-#'''
-##radius_holder2.append(temp3)
-#for i in range(len(pc_holder)):
-#    plt.plot(radi[i],pc_holder[i],'ro')
-#    plt.plot(radi[i],epo1(radi[i],radius_holder[i][0],radius_holder[i][1]))
-#    plt.title("Correlation Function")
-#    plt.xlabel("units")
-#    plt.ylabel("Averaged Correlation Function")
-#    plt.yscale("log")
-#    #plt.xscale("log")
-#    plt.show()
-#
-#'''
-#
-#plt.plot(1./(np.array(radius_holder)[:,1]))
-#plt.title("Correlation Length w Exponential Over Samples")
-#plt.xlabel("Sample #")
-#plt.ylabel("Correlation Length (lattice units)")
-#plt.show()
-#
 
+pc_holder=[]
+radius_holder=[]
+radius_holder2=[]
+radi=[]
+popt1=[]
+
+for i in range(len(VA_data_type_O)):
+   temp1, temp2, temp3 = paircorrelation3D_a(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=0.5)
+   pc_holder.append(temp1)
+   radius_holder.append(temp2)
+   radi.append(temp3)
+
+'''
+#radius_holder2.append(temp3)
+for i in range(len(pc_holder)):
+   plt.plot(radi[i],pc_holder[i],'ro')
+   plt.plot(radi[i],epo1(radi[i],radius_holder[i][0],radius_holder[i][1]))
+   plt.title("Correlation Function")
+   plt.xlabel("units")
+   plt.ylabel("Averaged Correlation Function")
+   plt.yscale("log")
+   #plt.xscale("log")
+   plt.show()
+
+'''
+
+plt.plot(1./(np.array(radius_holder)[:,1]))
+plt.title("Correlation Length w Exponential Over Samples")
+plt.xlabel("Sample #")
+plt.ylabel("Correlation Length (lattice units)")
+plt.show()
 
 
 
@@ -374,12 +401,12 @@ plt.show()
 '''
 
 #Creating datatype for animation (does not include animation)
-'''
+
 animate_DT = []
 
 for j in range(0,samples[0]):
     animate_DT.append(np.reshape(VA_data_type_O[j],(T_P,4)))
-'''
+
 
 
 
@@ -436,11 +463,47 @@ plt.show()
 
 
 def fit_decom(d,thresh = 0.5,max = 100000):
-
-    popt, pcov = curve_fit(fit_MSD,range(1,len(d)+1)[:int(len(range(1,len(d)+1))*thresh)],d[:int(len(range(1,len(d)+1))*thresh)],p0=[1,1],maxfev=10000)
+    popt, pcov = curve_fit(fit_MSD,range(1,len(d)+1)[:10],d[:10],p0=[1,1],maxfev=10000)
+    #popt, pcov = curve_fit(fit_MSD,range(1,len(d)+1)[:int(len(range(1,len(d)+1))*thresh)],d[:int(len(range(1,len(d)+1))*thresh)],p0=[1,1],maxfev=10000)
     return [popt,pcov]
 
+def MSD_Calculation(x):
+    track_ptype.append(x)
 
+    #msd
+    msd_t_mean = np.zeros(len(x))
+
+
+    fit_verbose = []
+    msd_s_mean = []
+    msd_s_mean_v = []
+
+
+    for i in range(len(x)):
+        msd_t_mean_p = np.zeros(len(x[i]))
+        msd_dec = []
+        
+        for j in range(len(x[i])):
+            pp = x[i][j]
+            
+            msd_t_mean_p[j] = MSD_tavg(pp[:,0],pp[:,1],pp[:,2],1,sizeN)
+            tttt=track_decomp(pp[:,0],pp[:,1],pp[:,2],1,sizeN)
+            msd_dec.append(tttt)
+        
+
+
+        msd_dec = np.mean(np.asarray(msd_dec),axis = 0)
+        msd_s_mean.append(msd_dec)
+                        
+        msd_t_mean[i] = np.mean(msd_t_mean_p)
+
+    msd_s_meana_cm.append(np.mean(np.asarray(msd_s_mean),axis = 0))
+
+    fit_msdaa_cm.append(fit_decom(np.mean(np.asarray(msd_s_mean),axis = 0))[0])
+
+    msd_t_meana_cm[k] = np.mean(msd_t_mean)
+    msd_t_mean_verba_cm.append(msd_t_mean)
+    return 0
 
 
 ############################################################################################
@@ -457,28 +520,43 @@ msd_t_mean_verba = []
 fit_verbosea = [[] for i in new_size]
 fit_verbosed = [[] for i in new_size]
 fit_msdaa = []
-    
+
+
 msd_s_meana = []
 msd_s_mean_va = [[] for i in new_size]
 
+
+msd_t_meana_cm = np.zeros(len(sizeM))
+msd_t_mean_verba_cm = []
+    
+
+fit_msdaa_cm = []
+
+
+msd_s_meana_cm = []
+
+
 for k in range(len(sizeM)):
     n_ordered_arr = np.zeros((sizeM[k],sizeP[k],samples[0],4))
+    cm_ordered_arr = np.zeros((1,sizeP[k],samples[0],3))
     for i in range(len(VA_data_type_O)):
         for j in range(len(VA_data_type_O[i][k])):
             for l in range(len(VA_data_type_O[i][k][j])):
                 n_ordered_arr[l][j][i] = VA_data_type_O[i][k][j][l]
+            cm_ordered_arr[0][j][i] = cm(VA_data_type_O[i][k][j][:,0],VA_data_type_O[i][k][j][:,1],VA_data_type_O[i][k][j][:,2],sizeN)
 
+    MSD_Calculation(cm_ordered_arr)
     track_ptype.append(n_ordered_arr)
 
     #msd
-
     msd_t_mean = np.zeros(len(n_ordered_arr))
 
 
     fit_verbose = []
-
     msd_s_mean = []
     msd_s_mean_v = []
+
+
     for i in range(len(n_ordered_arr)):
         msd_t_mean_p = np.zeros(len(n_ordered_arr[i]))
         msd_dec = []
@@ -508,15 +586,16 @@ for k in range(len(sizeM)):
     msd_t_meana[k] = np.mean(msd_t_mean)
     msd_t_mean_verba.append(msd_t_mean)
 
+def msd_line(D_A,length):
+    return D_A[0]*range(length)**D_A[1]
 
 
-
-def msd_plot(m,verbose = False):
-    '''Verbose: all msd or averaged ; True, False'''
+def msd_plot(m,c12,verbose = False,cm = False):
+    #Verbose: all msd or averaged ; True, False
     if verbose:
         for i in range(len(m)):
             for j in m[i]:
-                plt.plot(j)
+                plt.plot(range(1,len(j)+1),j)
             plt.ylabel("MSD")
             plt.xlabel("Tau")
             plt.title("P = {0}, M = {1}".format(sizeP[i],sizeM[i]))
@@ -525,7 +604,13 @@ def msd_plot(m,verbose = False):
             plt.show()
     else:
         for i in range(len(m)):
-            plt.plot(m[i],label="{0}".format(i+1))
+            plt.plot(range(1,len(m[i])+1),m[i],label="{0}".format(i+1))
+            plt.plot(range(1,len(c12[i])+1),c12[i])
+            if cm:
+                plt.plot(msd_line(fit_msdaa_cm[0],len(m[i])))  
+            else:
+                plt.plot(msd_line(fit_msdaa[0],len(m[i])))
+            #plt.plot(msd_line(fit_msdaa_cm[0],len(m[i])))
         plt.ylabel("MSD")
         plt.xlabel("Tau")
         plt.title("P = {0}, M = {1}".format(sizeP,sizeM))
@@ -714,17 +799,13 @@ def GMM_utility(data, n, biners=50, inclusion_thresh = [0,100], verbose=True, ti
 
 
 
-
-
-
-
 #############################################################################################
 #
 ##plotting and animations
 #
 #############################################################################################
-#
-# Set up formatting for the movie files
+
+#Set up formatting for the movie files
 Writer = matplotlib.animation.writers['ffmpeg']
 writer = Writer(fps=10, metadata=dict(artist='Baljyot Parmar, all rights reserved'), bitrate=1800)
 
@@ -735,6 +816,7 @@ def update_graph(num):
     i = animate_DT[num]
 
     graph._offsets3d = (i[:,0],i[:,1],i[:,2])
+    graph.set_color(i[:,3])
 
     title.set_text('3D Test, Sample={}'.format(num))
 
@@ -753,7 +835,7 @@ plt.show()
 
 plt.plot(animate_DT[0][:,0],animate_DT[0][:,1],'ro')
 plt.show()
-
+'''
 '''
 for k in range(0,samples[0]):
     for i in VA_data_type_O[k]:
@@ -764,9 +846,6 @@ for k in range(0,samples[0]):
     ax.set_ybound(lower=0,upper=sizeN)
     ax.set_zbound(lower=0,upper=sizeN)
 plt.show()
-
-
-'''
 
 
 
