@@ -17,7 +17,7 @@ Boost library, standard library, c++11 compiler, libconfig
 TODO
 Compile with command
 ```
-g++ -std=c++11 -libconfig temp_pf.cpp -o your_file_name
+g++ -std=c++11 -lconfig++ temp_pf.cpp -o your_file_name
 ```
 Comes with compiled OSX v.10.14.4. Have not tested with windows but linux works.
 
