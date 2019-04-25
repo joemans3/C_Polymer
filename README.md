@@ -19,6 +19,11 @@ Compile with command
 ```
 g++ -std=c++11 -lconfig++ temp_pf.cpp -o your_file_name
 ```
+Run your executible with alone and have the program prompt you to input parameters or with an init file in the format given. For latter use command (after compiling):
+```
+./your_file_name init_file.cfg
+
+```
 Comes with compiled OSX v.10.14.4. Have not tested with windows but linux works.
 
 <!---
