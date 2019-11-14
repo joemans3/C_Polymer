@@ -10,11 +10,17 @@ TODO
 What things you need to install the software and how to install them
 
 ```
-Boost library, standard library, c++11 compiler
+Boost library, standard library, c++11 compiler, libconfig
 ```
 
 ### Installing
 TODO
+Compile with command
+```
+g++ -std=c++11 -lconfig++ temp_pf.cpp -o your_file_name
+```
+Comes with compiled OSX v.10.14.4. Have not tested with windows but linux works.
+
 <!---
 A step by step series of examples that tell you how to get a development env running
 
