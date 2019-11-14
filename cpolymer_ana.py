@@ -5,13 +5,83 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d import axes3d as ax3d
 import matplotlib.animation
+import matplotlib.colors as colors
+import math
+from pathlib import Path
+
 from cmpaircorrelation import *
 from scipy.optimize import curve_fit
 import shutil
 import pdb
-path = raw_input("Path of folder: ")
+
+#convert degrees to rad
+def d_to_rad(deg_):
+    return np.array(deg_)*np.pi/180.0
+
+#convert rad to deg
+def rad_to_d(rad_):
+    return np.array(rad_)*180.0/np.pi
 
 
+
+
+def dot(a,b):
+    return a[0]*b[0] + a[1]*b[1]
+
+
+def ang(a,b):
+
+    ''' takes input as tuple of tuples of X,Y.'''
+
+    la = [(a[0][0]-a[1][0]), (a[0][1]-a[1][1])]
+    lb = [(b[0][0]-b[1][0]), (b[0][1]-b[1][1])]
+
+    dot_ab = dot(la,lb)
+
+    ma = dot(la,la)**0.5
+    mb = dot(lb,lb)**0.5
+
+    a_cos = dot_ab/(ma*mb)
+    try:
+        angle = math.acos(dot_ab/(mb*ma))
+    except:
+        angle = math.acos(round(dot_ab/(mb*ma)))
+
+    ang_deg = math.degrees(angle)%360
+
+    if ang_deg-180>=0:
+        return 360 - ang_deg
+    else:
+        return ang_deg
+
+
+def angle_trajectory_3d(x,y,z,ref = True):
+    ''' Takes input (x,y,z) of a series of arrays or one array of 
+    trajectorie(s) and returns a series or one array of angles in 3D.
+    
+    INPUTS:
+
+    x,y (array-like): series of arrays or one array of trajectorie(s).
+
+    ref (boolian): If True, return an extra angle which is the angle between the first line in the set and a verticle line
+    
+    RETURN:
+
+    Array-like: A series or one array of angles in 2D depending on shape of x,y,z.
+
+
+    '''
+   
+    if isinstance(x[0],list):
+        angle_list = [[] for i in x]
+        for i in range(len(x)):
+            for j in range(len(x[i])-2):
+
+                angle_list[i].append(ang((((x[i],y[i],z[i]),(x[i+1],y[i+1],z[i+1])),((x[i+1],y[i+1],z[i+1]),(x[i+2],y[i+2],z[i+2])))))
+        return angle_list
+
+    else:
+        return [ang(((x[i],y[i],z[i]),(x[i+1],y[i+1],z[i+1])),((x[i+1],y[i+1],z[i+1]),(x[i+2],y[i+2],z[i+2]))) for i in range(len(x)-2)]
 
 
 def dis(x,y,z,x1,y1,z1,N):
@@ -23,6 +93,47 @@ def dis(x,y,z,x1,y1,z1,N):
     tz=np.minimum(t3,abs(z1-z + N))
     temp=np.sqrt((tx)**2 + (ty)**2 + (tz)**2)
     return temp
+
+
+
+
+#plot a histogram of angles in polar coordinates for each fraction
+def hist_polar(data, fig = False, ax_n = False, bin_n = 10, show = True, include_ = True, align = 'edge'): #align can also be 'center'
+    '''Helper function to plot histogram of angles in deg on polar coordinates.'''
+
+    bins = np.linspace(0.0, 2.0 * np.pi, bin_n + 1.0)
+
+    #convert to radians
+    temp = d_to_rad(data)
+    if include_:
+        angle_rad = temp
+    else:
+        angle_rad = temp[temp<3.14]
+
+    print(angle_rad)
+    n, _ = np.histogram(angle_rad, bins)
+
+    width = 2.0 * np.pi / bin_n
+
+    if fig == False:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='polar')
+
+    else:
+        ax = fig.add_subplot(ax_n)
+
+
+    bars = ax.bar(bins[:bin_n], n, width=width, bottom=0.0,align = align)
+
+    for bar in bars:
+        bar.set_alpha(0.5)
+
+    if show:
+        plt.show()
+
+    return angle_rad
+
+
 
 
 def fit_MSD(t,p_0,p_1):
@@ -52,7 +163,7 @@ def track_decomp(x,y,z,f,N):
     #pcov = covariance matrix of fit
     max_track_decomp = 10.
     max_decomp = np.floor(len(x)/max_track_decomp)
-    tau = range(1,int(max_decomp+1))
+    tau = list(range(1,int(max_decomp+1)))
     msd = []
     for i in tau:
         n_x = np.array(x)[::i]
@@ -82,7 +193,7 @@ def track_decomp1(x,y,f):
     #pcov = covariance matrix of fit
     max_track_decomp = 1.
     max_decomp = np.floor(len(x)/max_track_decomp)
-    tau = range(1,int(max_decomp+1.0))
+    tau = list(range(1,int(max_decomp+1.0)))
     msd = []
     for i in tau:
         if i < len(x):
@@ -108,7 +219,7 @@ def track_decomp1(x,y,f):
 
 
 
-
+path = input("Give me path ")
 
 
 
@@ -175,43 +286,75 @@ sizeM = []
 sizeP = []
 sizeN = 0
 samples = 0
+R = 0
+temp = 0
 
 def convert_to_int(input):
 
-    return map(int,input.split(","))
+    return list(map(int,input.split(",")))
 def convert_to_float(input):
-    return map(float,input.split(","))
-def convert_globals(input):
+    return list(map(float,input.split(",")))
+def convert_globals(input, input2):
     SC_index_a = []
     C_index_a = []
+    SC_index2_a = []
+    C_index2_a = []
     sizeN = 0
     sizeM = []
     sizeP = []
+
     for i in range(0,len(input)):
         if input[i]==";":
             SC_index_a.append(i)
         if input[i]==",":
             C_index_a.append(i)
+
+    for i in range(0,len(input2)):
+        if input2[i]==",":
+            C_index2_a.append(i)
+        if input2[i]==":":
+            SC_index2_a.append(i)
+
+    R = int(input2[SC_index2_a[0]+1:C_index2_a[0]])
+    temp = float(input2[SC_index2_a[2]+1:])
     sizeN = int(input[:SC_index_a[0]])
     sizeP = convert_to_int(input[SC_index_a[0]+1:SC_index_a[1]])
     sizeM = convert_to_int(input[SC_index_a[1]+1:SC_index_a[2]])
     samples = convert_to_int(input[SC_index_a[2]+1:SC_index_a[3]])
     version = input[SC_index_a[3]+1:]
-    return [sizeN, sizeP, sizeM, samples,version]
+    return [sizeN, sizeP, sizeM, samples,version,R,temp]
 
 #change to ignore first line
 with open(path,"r") as f:
-    line = (f.readline()).rstrip('\n')
-    sizeN,sizeP,sizeM,samples,version = convert_globals(line)
+    line = 0
+    line2 = 0
+    for i in range(3):
+        temp_line = (f.readline()).rstrip('\n')
+        if i == 0:
+            line = temp_line
+        elif i == 2:
+            line2 = temp_line
+    sizeN,sizeP,sizeM,samples,version,R,temp = convert_globals(line, line2)
 f.close()
 
 dname = os.path.dirname(path)
 os.chdir(dname)
 
-if not os.path.exists(path[len(dname)+1:]+"_folder"):
+
+
+
+if (not os.path.exists(path[len(dname)+1:]+"_folder")) and (str(Path.cwd())[-6:] != "folder"):
     os.makedirs(path[len(dname)+1:]+"_folder")
 
-os.chdir(path+"_folder")
+    os.chdir(path+"_folder")
+
+    shutil.move(path,path+"_folder/"+path[len(dname)+1:])
+    os.chdir(os.path.dirname(path+"_folder/"+path[len(dname)+1:]))
+    path = path+"_folder/"+path[len(dname)+1:]
+
+
+
+
 
 
 
@@ -219,7 +362,10 @@ sizeMP = np.cumsum(np.asarray(sizeM)*np.asarray(sizeP))
 T_P= np.sum(np.asarray(sizeM)*np.asarray(sizeP))
 data = np.loadtxt(path,delimiter=",",skiprows=3)
 
-shutil.move(path,path+"_folder/"+path[len(dname)+1:])
+write_bool = False
+
+
+
 
 
 
@@ -231,8 +377,8 @@ with open(path[len(dname)+1:]+".xyz","w+") as f:
         f.write("{0}\n".format(T_P))
         f.write("\n")
         VA_data_type = []
-        for i in range(0,T_P):
-            f.write("H {0} {1} {2}\n".format(data[samples[0]*j + i][0],data[samples[0]*j + i][1],data[samples[0]*j + i][2]))
+        if write_bool:
+            f.write("H {0} {1} {2}\n".format(data[j][0],data[j][1],data[j][2]))
         for i in range(0,len(sizeMP)):
             if i==0:
                 VA_data_type.append(np.resize(data[T_P*j:sizeMP[i]+T_P*j],(sizeP[i],sizeM[i],4)))
@@ -269,21 +415,23 @@ for i in VA_data_type_O:
 
 
 
+
+
 #finding total distance per frame
-distance_arr=[]
-for i in range(len(x_per_frame)):
-   distance_t=0
-   for j in range(len(x_per_frame[i])):
-       for kk in range(j+1,len(x_per_frame[i])):
-           distance_t+=dist(x_per_frame[i][j],y_per_frame[i][j],z_per_frame[i][j],[x_per_frame[i][kk],y_per_frame[i][kk],z_per_frame[i][kk]],sizeN)
+# distance_arr=[]
+# for i in range(len(x_per_frame)):
+#    distance_t=0
+#    for j in range(len(x_per_frame[i])):
+#        for kk in range(j+1,len(x_per_frame[i])):
+#            distance_t+=dist(x_per_frame[i][j],y_per_frame[i][j],z_per_frame[i][j],[x_per_frame[i][kk],y_per_frame[i][kk],z_per_frame[i][kk]],sizeN)
 
-   distance_arr.append(distance_t)
+#    distance_arr.append(distance_t)
 
-plt.plot(distance_arr)
-plt.title("Total Distance per Sample")
-plt.xlabel("Sample #")
-plt.ylabel("Distance (lattice units)")
-plt.show()
+# plt.plot(distance_arr)
+# plt.title("Total Distance per Sample")
+# plt.xlabel("Sample #")
+# plt.ylabel("Distance (lattice units)")
+# plt.show()
 
 
 
@@ -293,46 +441,45 @@ plt.show()
 
 #calculating pair correlation function.
 
-pc_holder=[]
-radius_holder=[]
-radius_holder2=[]
-distance=[]
-radi=[]
+# pc_holder=[]
+# radius_holder=[]
+# radius_holder2=[]
+# distance=[]
+# radi=[]
 
 
-for i in range(len(VA_data_type_O)):
-    temp1 , temp2 ,temp3 , temp4 = paircorrelation3D(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=1)
-    pc_holder.append(temp1)
-    radius_holder.append(temp2)
-    distance.append(temp3)
-    radi.append(temp4)
+# for i in range(len(VA_data_type_O)):
+#     temp1 , temp2 ,temp3 , temp4 = paircorrelation3D(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=1)
+#     pc_holder.append(temp1)
+#     radius_holder.append(temp2)
+#     distance.append(temp3)
+#     radi.append(temp4)
 
 
-# for i in range(len(pc_holder[::10])):
-#     plt.plot(radi[i],pc_holder[i],'ro')
-#     plt.plot(radi[i],epo1(radi[i],radius_holder[i][0],radius_holder[i][1]))
-#     plt.title("Correlation Function")
-#     plt.xlabel("units")
-#     plt.ylabel("Averaged Correlation Function")
-#     plt.yscale("log")
-#     #plt.xscale("log")
-#     plt.show()
+# # for i in range(len(pc_holder[::10])):
+# #     plt.plot(radi[i],pc_holder[i],'ro')
+# #     plt.plot(radi[i],epo1(radi[i],radius_holder[i][0],radius_holder[i][1]))
+# #     plt.title("Correlation Function")
+# #     plt.xlabel("units")
+# #     plt.ylabel("Averaged Correlation Function")
+# #     plt.yscale("log")
+# #     #plt.xscale("log")
+# #     plt.show()
 
-#radius_holder2.append(temp3)
-plt.plot(1./(np.array(radius_holder)[:,1]))
-plt.title("Correlation Lenght Fit With Exponential Only")
-plt.xlabel("Sample Frame")
-plt.ylabel("Correlation Lenght (units of lattice)")
-plt.show()
+# radius_holder2.append(temp3)
+# plt.plot(1./(np.array(radius_holder)[:,1]))
+# plt.title("Correlation Lenght Fit With Exponential Only")
+# plt.xlabel("Sample Frame")
+# plt.ylabel("Correlation Lenght (units of lattice)")
+# plt.show()
 
-'''
-plt.plot((np.array(popt1)[:,0]))
-plt.title("Correlation Lenght Fit With Exponential Only")
-plt.xlabel("Sample Frame")
-plt.ylabel("Correlation Lenght (units of lattice)")
-plt.show()
 
-'''
+# plt.plot((np.array(popt1)[:,0]))
+# plt.title("Correlation Lenght Fit With Exponential Only")
+# plt.xlabel("Sample Frame")
+# plt.ylabel("Correlation Lenght (units of lattice)")
+# plt.show()
+
 
 
 
@@ -342,17 +489,17 @@ plt.show()
 
 
 
-pc_holder=[]
-radius_holder=[]
-radius_holder2=[]
-radi=[]
-popt1=[]
+# pc_holder=[]
+# radius_holder=[]
+# radius_holder2=[]
+# radi=[]
+# popt1=[]
 
-for i in range(len(VA_data_type_O)):
-   temp1, temp2, temp3 = paircorrelation3D_a(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN,CM_ar[i],c_per_frame[i],dr=0.5)
-   pc_holder.append(temp1)
-   radius_holder.append(temp2)
-   radi.append(temp3)
+# for i in range(len(VA_data_type_O)):
+#    temp1, temp2, temp3 = paircorrelation3D_a(x_per_frame[i],y_per_frame[i],z_per_frame[i],sizeN/2.,CM_ar[i],c_per_frame[i],dr=0.5)
+#    pc_holder.append(temp1)
+#    radius_holder.append(temp2)
+#    radi.append(temp3)
 
 '''
 #radius_holder2.append(temp3)
@@ -367,21 +514,21 @@ for i in range(len(pc_holder)):
    plt.show()
 
 '''
-
-plt.plot(1./(np.array(radius_holder)[:,1]))
-plt.title("Correlation Length w Exponential Over Samples")
-plt.xlabel("Sample #")
-plt.ylabel("Correlation Length (lattice units)")
-plt.show()
-
-
+# expo_correlation = 1./(np.array(radius_holder)[:,1])
+# plt.plot(1./(np.array(radius_holder)[:,1]))
+# plt.title("Correlation Length w Exponential Over Samples")
+# plt.xlabel("Sample #")
+# plt.ylabel("Correlation Length (lattice units)")
+# plt.show()
 
 
 
 
-#for i in range(len(distance)):
+
+
+# for i in range(len(distance)):
 #    plt.hist(pc_holder[i])
-#
+
 #    plt.show()
 
 
@@ -402,10 +549,10 @@ plt.show()
 
 #Creating datatype for animation (does not include animation)
 
-animate_DT = []
+# animate_DT = []
 
-for j in range(0,samples[0]):
-    animate_DT.append(np.reshape(VA_data_type_O[j],(T_P,4)))
+# for j in range(0,samples[0]):
+#     animate_DT.append(np.reshape(VA_data_type_O[j],(T_P,4)))
 
 
 
@@ -462,8 +609,12 @@ plt.show()
 '''
 
 
+
+
+
+
 def fit_decom(d,thresh = 0.5,max = 100000):
-    popt, pcov = curve_fit(fit_MSD,range(1,len(d)+1)[:10],d[:10],p0=[1,1],maxfev=10000)
+    popt, pcov = curve_fit(fit_MSD,list(range(1,len(d)+1))[:10],d[:10],p0=[1,1],maxfev=10000)
     #popt, pcov = curve_fit(fit_MSD,range(1,len(d)+1)[:int(len(range(1,len(d)+1))*thresh)],d[:int(len(range(1,len(d)+1))*thresh)],p0=[1,1],maxfev=10000)
     return [popt,pcov]
 
@@ -536,14 +687,55 @@ fit_msdaa_cm = []
 msd_s_meana_cm = []
 
 
+
+
+
+
+#global holder array for angle stuff
+ang_global = []
+
+
 for k in range(len(sizeM)):
+
+
+    #structured arrays for msd calculations
     n_ordered_arr = np.zeros((sizeM[k],sizeP[k],samples[0],4))
     cm_ordered_arr = np.zeros((1,sizeP[k],samples[0],3))
+
+
+    #structured arrays for angle between line n trajectory
+    #setup as n_ordered_arr but with size ((sizeM[k],sizeP[k],samples[0]-2))
+
+    ang_ordered_arr = np.zeros((sizeM[k],sizeP[k],samples[0]-2))
+
+
     for i in range(len(VA_data_type_O)):
         for j in range(len(VA_data_type_O[i][k])):
             for l in range(len(VA_data_type_O[i][k][j])):
                 n_ordered_arr[l][j][i] = VA_data_type_O[i][k][j][l]
             cm_ordered_arr[0][j][i] = cm(VA_data_type_O[i][k][j][:,0],VA_data_type_O[i][k][j][:,1],VA_data_type_O[i][k][j][:,2],sizeN)
+
+
+
+
+    #do the angle calculations
+    for i in range(len(ang_ordered_arr)):
+        for j in range(len(ang_ordered_arr[i])):
+            temp_array = np.asarray(n_ordered_arr[i][j])
+            ang_ordered_arr[i][j] = angle_trajectory_3d(temp_array[:,0],temp_array[:,1],temp_array[:,2])
+
+    ang_global.append(ang_ordered_arr)  
+    # outdated code to save data to file for angle -> now do it in this script: TODO -> make a modular way for this to occur
+    # import csv
+    # with open('employee_file_{0}.csv'.format(k), mode='w') as employee_file:
+    #     employee_writer = csv.writer(employee_file, delimiter=',')
+
+    #     for j in n_ordered_arr[0]:
+    #         for i in n_ordered_arr[0][0]:
+    #             employee_writer.writerow(i)
+
+
+
 
     MSD_Calculation(cm_ordered_arr)
     track_ptype.append(n_ordered_arr)
@@ -581,21 +773,47 @@ for k in range(len(sizeM)):
 
     msd_s_meana.append(np.mean(np.asarray(msd_s_mean),axis = 0))
 
-    fit_msdaa.append(fit_decom(np.mean(np.asarray(msd_s_mean),axis = 0))[0])
+    fit_msdaa.append(fit_decom(np.mean(np.asarray(msd_s_mean),axis = 0))[k])
 
     msd_t_meana[k] = np.mean(msd_t_mean)
     msd_t_mean_verba.append(msd_t_mean)
 
+
+
+
+#plotting angle stuff
+
+
+for i in range(len(ang_global[0])):
+    for j in range(len(ang_global[0][i])):
+        hist_polar(ang_global[0][i][j])
+
+
+
+hist_polar(ang_global[1][0][0])
+
+
+
+
+
+
+
+
+
+
+
 def msd_line(D_A,length):
-    return D_A[0]*range(length)**D_A[1]
+    return D_A[0]*list(range(length))**D_A[1]
 
+def msd_line2(D_A,length):
+    return D_A[0]*np.array((range(length)))**D_A[1]
 
-def msd_plot(m,c12,verbose = False,cm = False):
+def msd_plot(m,c12,a,b,verbose = False,cm = False): #a,b = expanded values of fit_msdaa
     #Verbose: all msd or averaged ; True, False
     if verbose:
         for i in range(len(m)):
             for j in m[i]:
-                plt.plot(range(1,len(j)+1),j)
+                plt.plot(list(range(1,len(j)+1)),j)
             plt.ylabel("MSD")
             plt.xlabel("Tau")
             plt.title("P = {0}, M = {1}".format(sizeP[i],sizeM[i]))
@@ -604,26 +822,60 @@ def msd_plot(m,c12,verbose = False,cm = False):
             plt.show()
     else:
         for i in range(len(m)):
-            plt.plot(range(1,len(m[i])+1),m[i],label="{0}".format(i+1))
-            plt.plot(range(1,len(c12[i])+1),c12[i])
+            plt.plot(list(range(1,len(m[i])+1)),m[i],label="{0}".format(i+1))
+            plt.plot(list(range(1,len(c12[i])+1)),c12[i])
             if cm:
                 plt.plot(msd_line(fit_msdaa_cm[0],len(m[i])))  
             else:
                 plt.plot(msd_line(fit_msdaa[0],len(m[i])))
+                #plt.plot(msd_line2([a,b],len(m[i])))
             #plt.plot(msd_line(fit_msdaa_cm[0],len(m[i])))
-        plt.ylabel("MSD")
-        plt.xlabel("Tau")
-        plt.title("P = {0}, M = {1}".format(sizeP,sizeM))
+        plt.ylabel("Log10 MSD (units of simulation box)")
+        plt.xlabel("Log10 Tau (timestep of trajectory)")
+        #plt.title("P = {0}, M = {1}".format(sizeP,sizeM))
         plt.yscale("log")
         plt.xscale("log")
-        plt.legend()
+        #plt.legend()
+        plt.savefig("MSD curve")
         plt.show()
     return
 
 
+# fig = plt.figure()
+# ax = fig.add_subplot(211)
+# ax2 = fig.add_subplot(212)
+
+# for i in range(len(msd_s_meana)):
+#     ax.plot(list(range(1,len(msd_s_meana[i])+1)),msd_s_meana[i],label="{0}".format(i+1))
+#     ax.plot(list(range(1,len(msd_s_meana_cm[i])+1)),msd_s_meana_cm[i])
+
+#     ax.plot(msd_line(fit_msdaa[0],len(msd_s_meana[i])))
+#         #plt.plot(msd_line2([a,b],len(m[i])))
+#     #plt.plot(msd_line(fit_msdaa_cm[0],len(m[i])))
+# ax2.plot(fit_verbosed[0])
+# ax.annotate('A', xy=(-40, -10 + ax2.bbox.height), xycoords="axes pixels", fontsize=25, weight = 'bold')
+# ax2.annotate('B', xy=(-40, -10 + ax2.bbox.height), xycoords="axes pixels", fontsize=25, weight = 'bold')
+# ax.set_ylabel("Log10 MSD (au)")
+# ax.set_xlabel("Log10 Tau")
+# #plt.title("P = {0}, M = {1}".format(sizeP,sizeM))
+# ax.set_yscale("log")
+# ax.set_xscale("log")
+
+# ax2.set_ylabel("Diffusion Coefficient (au)")
+# ax2.set_xlabel("Monomer Index")
+# #plt.title("P = {0}, M = {1}".format(sizeP,sizeM))
+# # ax2.yscale("log")
+# # ax2.xscale("log")
+# #plt.legend()
+# fig.tight_layout()
+# fig.savefig("time")
+# fig.show()
+
+
+
 def create_box_plot(box_data,tick_list,y_label = "",x_label = "",y_lim = (),title = ""):
     ticks = tick_list
-    plt.boxplot(box_data,positions = range(1,len(tick_list)+1))
+    plt.boxplot(box_data,positions = list(range(1,len(tick_list)+1)))
     for i in range(1,len(tick_list)+1):
         y = box_data[i-1]
         x = np.random.normal(i, 0.04, size=len(y))
@@ -631,8 +883,8 @@ def create_box_plot(box_data,tick_list,y_label = "",x_label = "",y_lim = (),titl
     try:
         plt.ylim(y_lim)
     except:
-        print "Warning: y_lim not valid"
-    plt.xticks(xrange(1, len(ticks) * 1 + 1, 1), ticks)
+        print("Warning: y_lim not valid")
+    plt.xticks(range(1, len(ticks) * 1 + 1, 1), ticks)
     plt.ylabel(y_label)
     plt.xlabel(x_label)
     plt.title(title)
@@ -672,10 +924,10 @@ def GMM_utility(data, n, biners=50, inclusion_thresh = [0,100], verbose=True, ti
     gmix.fit(data_arr)
 
     if log:
-        print "Fitted Mean: {0} +/- {1}".format(gmix.means_[:,1],np.sqrt(gmix.covars_[:,1]))
-        print "Fitted Mean(normal): {0} +/- {1}".format(np.exp(gmix.means_[:,1]),np.exp(gmix.means_[:,1])*np.sqrt(gmix.covars_[:,1]))
+        print("Fitted Mean: {0} +/- {1}".format(gmix.means_[:,1],np.sqrt(gmix.covars_[:,1])))
+        print("Fitted Mean(normal): {0} +/- {1}".format(np.exp(gmix.means_[:,1]),np.exp(gmix.means_[:,1])*np.sqrt(gmix.covars_[:,1])))
     else:
-        print "Fitted Mean: {0} +/- {1}".format(gmix.means_[:,1],np.sqrt(gmix.covars_[:,1]))
+        print("Fitted Mean: {0} +/- {1}".format(gmix.means_[:,1],np.sqrt(gmix.covars_[:,1])))
     max_r = np.max(results)
     plt.plot(np.diff(bins)+bins[:len(bins)-1],results)
 
@@ -687,7 +939,7 @@ def GMM_utility(data, n, biners=50, inclusion_thresh = [0,100], verbose=True, ti
     try:
         plt.xlim(x_limit)
     except:
-        print "Warning: x_limit is invalid"
+        print("Warning: x_limit is invalid")
     plt.show()
 
     return
@@ -695,19 +947,39 @@ def GMM_utility(data, n, biners=50, inclusion_thresh = [0,100], verbose=True, ti
 
 
 
+def plot_distance_time(distances):
+
+    fig, ax = plt.subplots()
+
+    ax.plot(np.arange(0,R,(R/(samples[0]-1))),distances[1:])
+    ax.set_title("Total distance between all monomers over time")
+    ax.set_xlabel("Simulation time (arbritrary units)")
+    ax.set_ylabel("Total distance (units of Simulation Box)")
+    fig.savefig("Distance over time")
+    plt.tight_layout()
+    plt.show()
+
+    return [np.arange(0,R,(R/(samples[0]-1))),distances[1:]]
+
+def plot_correlation_time(correlation):
+
+    fig, ax = plt.subplots()
+
+    ax.plot(np.arange(0,R,(R/(samples[0]-1))),correlation[1:])
+    ax.set_title("Correlation length of system over time")
+    ax.set_xlabel("Simulation time (arbritrary units)")
+    ax.set_ylabel("Correlation length (units of simulation box)")
+    fig.savefig("Correlation over time")
+    plt.tight_layout()
+    plt.show()
+
+    return [np.arange(0,R,(R/(samples[0]-1))),correlation[1:]]
 
 
 
 
-
-
-
-
-
-
-
-
-
+# return_dis = plot_distance_time(distance_arr)
+# return_corr = plot_correlation_time(expo_correlation)
 
 
 
@@ -789,66 +1061,104 @@ def GMM_utility(data, n, biners=50, inclusion_thresh = [0,100], verbose=True, ti
 
 
 
+def normalize_colors(color_float, max_c = 10., min_c = -10., range_min = 0., range_max = 1.):
+
+    return (range_max - range_min) * ((color_float - min_c))/(max_c - min_c) + range_min
+
+
+import matplotlib.cm as cm_color
+def hi(val = 10):
+    #############################################################################################
+    #
+    ##plotting and animations
+    #
+    #############################################################################################
+
+    #Set up formatting for the movie files
+    Writer = matplotlib.animation.writers['ffmpeg']
+    writer = Writer(fps=10, metadata=dict(artist='Baljyot Parmar, all rights reserved'), bitrate=1800)
+
+    norm = colors.Normalize(vmin=-10, vmax=10)
+    m = cm_color.ScalarMappable(norm=norm, cmap="winter")
+
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    title = ax.set_title('3D Test')
+
+
+    def update_graph(num):
+        i = animate_DT[num]
+
+        graph._offsets3d = (i[:,0],i[:,1],i[:,2])
+
+
+        title.set_text('3D Test, Sample={}'.format(num))
+
+    graph = ax.scatter(animate_DT[0][:,0],animate_DT[0][:,1],animate_DT[0][:,2]) # for color coded with charge add c=m.to_rgba(animate_DT[0][:,3]) to plot argument
+
+    ax.set_xbound(lower=-1,upper=sizeN+1)
+    ax.set_ybound(lower=-1,upper=sizeN+1)
+    ax.set_zbound(lower=-1,upper=sizeN+1)
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+    ani = matplotlib.animation.FuncAnimation(fig, update_graph, list(range(1,samples[0])), blit=False)
+    ##ani.save('/Users/baljyot/Documents/Polymer_Output/new_ani.mp4',writer=writer)
+    ani.save('{0}/new_ani.mp4'.format(os.getcwd()),writer=writer)
+    plt.show()
 
 
 
 
+    fig = plt.figure()
+    ax = fig.add_subplot(221,projection = '3d')
+    ax.set_xlim([0, sizeN])
+    ax.set_ylim([0, sizeN])
+    ax.set_zlim([0, sizeN])
 
+    ax2 = fig.add_subplot(222,projection = '3d')
+    ax2.set_xlim([0, sizeN])
+    ax2.set_ylim([0, sizeN])
+    ax2.set_zlim([0, sizeN])
 
+    ax3 = fig.add_subplot(223)
+    ax4 = fig.add_subplot(224)
 
+    ax.scatter(animate_DT[0][:,0],animate_DT[0][:,1],animate_DT[0][:,2]) #color add , c=m.to_rgba(animate_DT[0][:,3])
+    ax.set_title("Simulation time = 0")
+    ax2.scatter(animate_DT[samples[0]-1][:,0],animate_DT[samples[0]-1][:,1],animate_DT[samples[0]-1][:,2]) # for color coded with charge add c=m.to_rgba(animate_DT[samples[0]-1][:,3]) to plot argument
+    ax2.set_title("Simulation time = {0}".format(R))
+    ax3.plot(np.arange(0,R,(R/(samples[0]-1))),distance_arr[1:])
+    ax3.set_xticks(np.linspace(0,R,3))
+    ax4.plot(np.arange(0,R,(R/(samples[0]-1))),1./(np.array(radius_holder)[:,1])[1:])
+    ax4.set_xticks(np.linspace(0,R,3))
+    ax3.set_xlabel("Simulation time (au)")
+    ax3.set_ylabel("Total distance (au)")
+    ax4.set_xlabel("Simulation time (au)")
+    ax4.set_ylabel("Correlation length (au)")
+    ax.annotate('A', xy=(-40, val + ax2.bbox.height), xycoords="axes pixels", fontsize=25, weight = 'bold')
+    ax2.annotate('B', xy=(-40, val + ax2.bbox.height), xycoords="axes pixels", fontsize=25, weight = 'bold')
+    ax3.annotate('C', xy=(-40, val + ax2.bbox.height), xycoords="axes pixels", fontsize=25, weight = 'bold')
+    ax4.annotate('D', xy=(-40, val + ax2.bbox.height), xycoords="axes pixels", fontsize=25, weight = 'bold')
+    plt.tight_layout()
+    plt.savefig("Panel")
 
+    plt.plot(animate_DT[0][:,0],animate_DT[0][:,1],'ro')
+    plt.show()
+    '''
+    '''
+    for k in range(0,samples[0]):
+        for i in VA_data_type_O[k]:
+            for j in i:
+                ax.scatter(j[:,0],j[:,1],j[:,2]) #for color add ,c=j[:,3] to argument
+        #ax.plot(j[:,0],j[:,1],j[:,2],'-b')
+        ax.set_xbound(lower=0,upper=sizeN)
+        ax.set_ybound(lower=0,upper=sizeN)
+        ax.set_zbound(lower=0,upper=sizeN)
+    plt.show()
 
-
-#############################################################################################
-#
-##plotting and animations
-#
-#############################################################################################
-
-#Set up formatting for the movie files
-Writer = matplotlib.animation.writers['ffmpeg']
-writer = Writer(fps=10, metadata=dict(artist='Baljyot Parmar, all rights reserved'), bitrate=1800)
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-title = ax.set_title('3D Test')
-def update_graph(num):
-    i = animate_DT[num]
-
-    graph._offsets3d = (i[:,0],i[:,1],i[:,2])
-    graph.set_color(i[:,3])
-
-    title.set_text('3D Test, Sample={}'.format(num))
-
-graph = ax.scatter(animate_DT[0][:,0],animate_DT[0][:,1],animate_DT[0][:,2],c=animate_DT[0][:,3])
-
-ax.set_xbound(lower=-1,upper=sizeN+1)
-ax.set_ybound(lower=-1,upper=sizeN+1)
-ax.set_zbound(lower=-1,upper=sizeN+1)
-ax.set_xlabel("x")
-ax.set_ylabel("y")
-ax.set_zlabel("z")
-ani = matplotlib.animation.FuncAnimation(fig, update_graph, range(1,samples[0]), blit=False)
-##ani.save('/Users/baljyot/Documents/Polymer_Output/new_ani.mp4',writer=writer)
-ani.save('{0}/new_ani.mp4'.format(os.getcwd()),writer=writer)
-plt.show()
-
-plt.plot(animate_DT[0][:,0],animate_DT[0][:,1],'ro')
-plt.show()
-'''
-'''
-for k in range(0,samples[0]):
-    for i in VA_data_type_O[k]:
-        for j in i:
-            ax.scatter(j[:,0],j[:,1],j[:,2],c=j[:,3])
-    #ax.plot(j[:,0],j[:,1],j[:,2],'-b')
-    ax.set_xbound(lower=0,upper=sizeN)
-    ax.set_ybound(lower=0,upper=sizeN)
-    ax.set_zbound(lower=0,upper=sizeN)
-plt.show()
-
-
-
+    return 
 
 
 

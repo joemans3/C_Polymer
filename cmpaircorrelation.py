@@ -50,8 +50,14 @@ def paircorrelation3D(x,y,z,S,CM,chg,dr=0.1):
     kk=int(round(0.1*len(kkk)))
     iq=max_v*fft.fft(g_average[k])
     iqf=fft.fftfreq(len(g_average[k]),dr)
+
+    popt1 = [1,1]
+    pcov1 = [[1,1],[1,1]]
     #popt, pcov = curve_fit(epo,radii[k],g_average[k],p0=[1,1,1],maxfev=100000)
-    popt1, pcov1 = curve_fit(epo1,radii[k][int(round(len(radii[k])*0.1)):],g_average[k][int(round(len(radii[k])*0.1)):],p0=[1,1],maxfev=100000)
+    try:
+        popt1, pcov1 = curve_fit(epo1,radii[k][int(round(len(radii[k])*0.1)):],g_average[k][int(round(len(radii[k])*0.1)):],p0=[1,1],maxfev=100000)
+    except:
+        pass
     #print popt[0],popt[1],1./popt[2], sqrt(pcov[0,0]),sqrt(pcov[1,1]),1./sqrt(pcov[2,2])
     #print popt1[0], popt1[1], 1./popt1[1], sqrt(pcov1[0,0]),sqrt(pcov1[1,1])
     #return (g_average, radii,rmax,avg_chg,iq,iqf,popt1,pcov1)
@@ -95,7 +101,10 @@ def paircorrelation3D_a(x,y,z,S,CM,chg,dr=0.1):
     iq=max_v*fft.fft(g_average[k])
     iqf=fft.fftfreq(len(g_average[k]),dr)
 #popt, pcov = curve_fit(epo,radii[k],g_average[k],p0=[1,1,1],maxfev=100000)
-    popt1, pcov1 = curve_fit(epo1,radii[k][:int(round(len(radii[k])*0.5))],g_average[k][:int(round(len(radii[k])*0.5))],p0=[1,1],maxfev=100000)
+    try:
+        popt1, pcov1 = curve_fit(epo1,radii[k][:int(round(len(radii[k])*0.5))],g_average[k][:int(round(len(radii[k])*0.5))],p0=[1,1],maxfev=100000)
+    except:
+        popt1 = [0,0,0]
     #print popt[0],popt[1],1./popt[2], sqrt(pcov[0,0]),sqrt(pcov[1,1]),1./sqrt(pcov[2,2])
     #print popt1[0], popt1[1], 1./popt1[1], sqrt(pcov1[0,0]),sqrt(pcov1[1,1])
     #return (g_average, radii,rmax,avg_chg,iq,iqf,popt1,pcov1)
